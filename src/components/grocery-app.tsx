@@ -1,4 +1,12 @@
-import { Globe, MagnifyingGlass, Plus, SignOut, UsersThree, WifiSlash } from '@phosphor-icons/react'
+import {
+  ArrowCounterClockwise,
+  Globe,
+  MagnifyingGlass,
+  Plus,
+  SignOut,
+  UsersThree,
+  WifiSlash
+} from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -15,7 +23,8 @@ import {
 import type { Product } from '../lib/types'
 import { AdminDrawer } from './admin-drawer'
 import { ProductDrawer } from './product-drawer'
-import { ProductRow } from './product-row'
+import { ProductSection } from './product-section'
+import { RestoreAllDialog } from './restore-all-dialog'
 
 export function GroceryApp() {
   const { t } = useTranslation()
@@ -24,6 +33,7 @@ export function GroceryApp() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Product | null>(null)
   const [adminOpen, setAdminOpen] = useState(false)
+  const [restoreAllOpen, setRestoreAllOpen] = useState(false)
   const [duplicatePulse, setDuplicatePulse] = useState('')
   const [toast, setToast] = useState('')
   const [online, setOnline] = useState(navigator.onLine)
@@ -200,6 +210,23 @@ export function GroceryApp() {
       ),
     onError: mutationError
   })
+  const restoreAll = useMutation({
+    mutationFn: ({
+      clearNotes,
+      resetQuantities
+    }: {
+      clearNotes: boolean
+      resetQuantities: boolean
+    }) => api.products.restoreAll(clearNotes, resetQuantities),
+    onSuccess: (restored) => {
+      const restoredById = new Map(restored.map((product) => [product.id, product]))
+      client.setQueryData<Product[]>(['products'], (current = []) =>
+        current.map((product) => restoredById.get(product.id) ?? product)
+      )
+      setRestoreAllOpen(false)
+    },
+    onError: mutationError
+  })
 
   function activateCreate() {
     if (duplicate) {
@@ -272,14 +299,20 @@ export function GroceryApp() {
                 onAdjust={(product, delta) => adjust.mutate({ product, delta })}
                 onToggle={(product) => toggle.mutate(product)}
               />
-              <div className="picked-divider">
-                <span />
-                {t('picked')}
-                <span />
-              </div>
               <ProductSection
-                title=""
+                title={t('picked')}
                 products={picked}
+                showCount={false}
+                headerAction={
+                  <button
+                    className="icon-button restore-all-button"
+                    disabled={!list.some((product) => product.is_picked)}
+                    onClick={() => setRestoreAllOpen(true)}
+                    aria-label={t('restoreAll')}
+                  >
+                    <ArrowCounterClockwise weight="bold" />
+                  </button>
+                }
                 duplicatePulse={duplicatePulse}
                 onEdit={setSelected}
                 onAdjust={(product, delta) => adjust.mutate({ product, delta })}
@@ -311,6 +344,13 @@ export function GroceryApp() {
       {auth.profile?.role === 'admin' && (
         <AdminDrawer open={adminOpen} onOpenChange={setAdminOpen} />
       )}
+      <RestoreAllDialog
+        key={restoreAllOpen ? 'restore-open' : 'restore-closed'}
+        open={restoreAllOpen}
+        onOpenChange={setRestoreAllOpen}
+        pending={restoreAll.isPending}
+        onConfirm={(options) => restoreAll.mutate(options)}
+      />
       <AppToast message={toast} />
       <PwaUpdate />
     </main>
@@ -333,47 +373,6 @@ function AppToast({ message }: { message: string }) {
         </motion.aside>
       )}
     </AnimatePresence>
-  )
-}
-
-function ProductSection({
-  title,
-  products,
-  duplicatePulse,
-  onEdit,
-  onAdjust,
-  onToggle
-}: {
-  title: string
-  products: Product[]
-  duplicatePulse: string
-  onEdit(product: Product): void
-  onAdjust(product: Product, delta: 1 | -1): void
-  onToggle(product: Product): void
-}) {
-  return (
-    <section className="product-section">
-      {title && (
-        <h2>
-          {title}
-          <span>{products.length}</span>
-        </h2>
-      )}
-      <motion.ul layout>
-        <AnimatePresence initial={false} mode="popLayout">
-          {products.map((product) => (
-            <ProductRow
-              key={product.id}
-              product={product}
-              duplicatePulse={duplicatePulse === product.id}
-              onEdit={() => onEdit(product)}
-              onAdjust={(delta) => onAdjust(product, delta)}
-              onToggle={() => onToggle(product)}
-            />
-          ))}
-        </AnimatePresence>
-      </motion.ul>
-    </section>
   )
 }
 

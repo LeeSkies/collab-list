@@ -55,6 +55,13 @@ export const api = {
       )
       return rows[0]!
     },
+    restoreAll: (clearNotes: boolean, resetQuantities: boolean) =>
+      unwrap<Product[]>(
+        supabase.rpc('restore_all_products', {
+          p_clear_notes: clearNotes,
+          p_reset_quantities: resetQuantities
+        })
+      ),
     update: async (
       product: Product,
       changes: { name: string; quantity: string; notes: string }

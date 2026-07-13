@@ -1,4 +1,4 @@
-import { ListBullets, Trash } from '@phosphor-icons/react'
+import { Eraser, ListBullets, Trash } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useMemo, useState, type FormEvent } from 'react'
@@ -150,7 +150,7 @@ export function ProductDrawer({
           </button>
         </div>
         <form id={formId} className="drawer-form" onSubmit={submit}>
-          <label>
+          <label className="notes-field">
             <span>{t('appName').includes('ה') ? 'שם המוצר' : 'Product name'}</span>
             <input
               value={values.name}
@@ -174,11 +174,22 @@ export function ProductDrawer({
             <span>
               {t('notes')} <small>{t('optional')}</small>
             </span>
-            <textarea
-              value={values.notes}
-              onChange={(event) => setValues({ ...values, notes: event.target.value })}
-              rows={4}
-            />
+            <span className="textarea-shell">
+              <textarea
+                value={values.notes}
+                onChange={(event) => setValues({ ...values, notes: event.target.value })}
+                rows={4}
+              />
+              <button
+                type="button"
+                className="clear-notes-button"
+                disabled={!values.notes}
+                onClick={() => setValues({ ...values, notes: '' })}
+                aria-label={t('clearProductNotes')}
+              >
+                <Eraser />
+              </button>
+            </span>
             <small className="counter">
               {[...values.notes].length}/{PRODUCT_NOTES_MAX}
             </small>

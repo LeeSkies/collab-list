@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(30);
 
 select has_table('public', 'products', 'products exists');
 select has_table('public', 'product_pick_history', 'history exists');
@@ -23,6 +23,19 @@ select lives_ok($$ select public.toggle_product_picked((select id from public.pr
 select is((select count(*)::integer from public.product_pick_history h join public.products p on p.id=h.product_id where p.name='Test apples'), 1, 'pick appends exactly one history event');
 select is((select picked_by_email from public.product_pick_history h join public.products p on p.id=h.product_id where p.name='Test apples'), 'admin@example.com', 'history snapshots the actor email');
 select throws_ok($$ select public.toggle_product_picked((select id from public.products where name='Test apples'), 1, false) $$, '40001', 'product_conflict', 'stale pick is rejected');
+
+select lives_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', 'seasonal', (select version from public.products where name='Test apples')) $$, 'picked product can be prepared for restore options test');
+select lives_ok($$ select public.restore_all_products(true, true) $$, 'restore all succeeds');
+select is((select is_picked from public.products where name='Test apples'), false, 'restore all restores picked products');
+select is((select notes from public.products where name='Test apples'), null, 'restore all can clear notes');
+select is((select quantity from public.products where name='Test apples'), 1::numeric, 'restore all can reset quantities');
+
+select lives_ok($$ select public.create_product('Test milk') $$, 'second product created');
+select lives_ok($$ select public.update_product((select id from public.products where name='Test milk'), 'Test milk', '3', 'keep cold', (select version from public.products where name='Test milk')) $$, 'second product has custom fields');
+select lives_ok($$ select public.toggle_product_picked((select id from public.products where name='Test milk'), (select version from public.products where name='Test milk'), false) $$, 'second product is bought');
+select lives_ok($$ select public.restore_all_products(false, false) $$, 'restore all without resets succeeds');
+select is((select notes from public.products where name='Test milk'), 'keep cold', 'restore all can preserve notes');
+select is((select quantity from public.products where name='Test milk'), 3::numeric, 'restore all can preserve quantities');
 
 set local role anon;
 select throws_ok(

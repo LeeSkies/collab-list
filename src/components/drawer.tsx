@@ -166,3 +166,45 @@ export function ConfirmDialog({
     </Dialog.Root>
   )
 }
+
+export function ChoiceDialog({
+  open,
+  onOpenChange,
+  title,
+  body,
+  confirmLabel,
+  children,
+  onConfirm,
+  pending = false
+}: {
+  open: boolean
+  onOpenChange(open: boolean): void
+  title: string
+  body: string
+  confirmLabel: string
+  children: ReactNode
+  onConfirm(): void
+  pending?: boolean
+}) {
+  const { t } = useTranslation()
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="dialog-backdrop" />
+        <Dialog.Viewport className="confirm-viewport">
+          <Dialog.Popup className="confirm-popup choice-dialog">
+            <Dialog.Title>{title}</Dialog.Title>
+            <Dialog.Description>{body}</Dialog.Description>
+            <div className="choice-dialog-options">{children}</div>
+            <div className="confirm-actions">
+              <Dialog.Close className="button secondary">{t('cancel')}</Dialog.Close>
+              <button className="button" disabled={pending} onClick={onConfirm}>
+                {confirmLabel}
+              </button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Viewport>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
