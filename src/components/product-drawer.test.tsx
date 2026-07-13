@@ -50,6 +50,7 @@ describe('ProductDrawer notes', () => {
     const onSave = vi.fn().mockResolvedValue(undefined)
     renderDrawer(onSave)
 
+    expect(screen.getByRole('heading', { name: 'Milk' })).toBeVisible()
     const notes = screen.getByRole('textbox', { name: /Notes/ })
     expect(notes).toHaveValue('Buy the blue carton')
     await user.click(screen.getByRole('button', { name: 'Clear notes' }))

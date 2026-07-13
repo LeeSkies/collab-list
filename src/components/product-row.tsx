@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { quantityCanAdjust } from '../lib/product'
 import type { Product } from '../lib/types'
+import { HoldToRevealName } from './hold-to-reveal-name'
 
 interface ProductRowProps {
   product: Product
@@ -79,7 +80,9 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
           onClick={onEdit}
           aria-label={t('edit', { name: product.name })}
         >
-          <strong>{product.name}</strong>
+          <strong>
+            <HoldToRevealName name={product.name} />
+          </strong>
           {product.notes && <span>{product.notes}</span>}
         </button>
         {product.is_picked ? (

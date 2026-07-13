@@ -13,6 +13,7 @@ import {
 } from '../lib/product'
 import type { PickHistory, Product } from '../lib/types'
 import { AppDrawer, ConfirmDialog } from './drawer'
+import { HoldToRevealName } from './hold-to-reveal-name'
 import { Button } from './ui/button'
 
 export function ProductDrawer({
@@ -95,7 +96,7 @@ export function ProductDrawer({
       <AppDrawer
         open={open}
         onOpenChange={requestClose}
-        title={t('edit', { name: product.name })}
+        title={<HoldToRevealName name={product.name} />}
         className="product-drawer"
         headerAction={
           <button
