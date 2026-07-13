@@ -777,7 +777,9 @@ body::before {
   padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border);
   background: var(--card);
-  transform: translateY(calc(-1 * var(--drawer-keyboard-inset, 0px)));
+  transform: translateY(
+    calc(-1 * var(--drawer-keyboard-inset, 0px) + var(--drawer-viewport-offset-top, 0px))
+  );
   transition: transform 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1));
 }
 .history-summary {

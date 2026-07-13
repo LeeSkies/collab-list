@@ -1,7 +1,7 @@
 import { Dialog } from '@base-ui/react/dialog'
 import { Drawer } from '@base-ui/react/drawer'
 import { X } from '@phosphor-icons/react'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 export function AppDrawer({
@@ -26,12 +26,16 @@ export function AppDrawer({
   className?: string
 }) {
   const { t } = useTranslation()
+  const viewportOffsetTop = useKeyboardViewportOffsetTop(open)
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} swipeDirection="down">
       <Drawer.VirtualKeyboardProvider>
         <Drawer.Portal>
           <Drawer.Backdrop className="drawer-backdrop" />
-          <Drawer.Viewport className="drawer-viewport">
+          <Drawer.Viewport
+            className="drawer-viewport"
+            style={{ '--drawer-viewport-offset-top': `${viewportOffsetTop}px` } as CSSProperties}
+          >
             <Drawer.Popup className={`drawer-popup ${className}`}>
               <header className="drawer-heading">
                 <span className="drawer-handle" aria-hidden="true" />
@@ -57,6 +61,37 @@ export function AppDrawer({
       {nested}
     </Drawer.Root>
   )
+}
+
+function useKeyboardViewportOffsetTop(open: boolean) {
+  const [offsetTop, setOffsetTop] = useState(0)
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!open || !viewport) {
+      return
+    }
+
+    let frame = 0
+    const update = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const keyboardOpen = window.innerHeight - viewport.height > 60
+        setOffsetTop(keyboardOpen ? Math.max(0, Math.ceil(viewport.offsetTop)) : 0)
+      })
+    }
+
+    update()
+    viewport.addEventListener('resize', update)
+    viewport.addEventListener('scroll', update)
+    return () => {
+      cancelAnimationFrame(frame)
+      viewport.removeEventListener('resize', update)
+      viewport.removeEventListener('scroll', update)
+    }
+  }, [open])
+
+  return open ? offsetTop : 0
 }
 
 export function ConfirmDialog({
