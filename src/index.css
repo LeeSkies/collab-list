@@ -771,28 +771,6 @@ body::before {
   padding: 16px 20px 20px;
   touch-action: pan-y;
 }
-.product-drawer .drawer-content {
-  display: flex;
-  flex-direction: column;
-}
-.product-drawer .drawer-form {
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
-}
-.product-drawer .drawer-form > button:last-child {
-  margin-top: auto;
-}
-.drawer-viewport[data-keyboard-open] .product-drawer .drawer-content {
-  display: block;
-}
-.drawer-viewport[data-keyboard-open] .product-drawer .drawer-form {
-  display: grid;
-  margin-bottom: calc(-1 * var(--drawer-content-gap-correction, 0px));
-}
-.drawer-viewport[data-keyboard-open] .product-drawer .drawer-form > button:last-child {
-  margin-top: 0;
-}
 .drawer-footer {
   position: relative;
   z-index: 2;
@@ -803,6 +781,10 @@ body::before {
     calc(-1 * var(--drawer-keyboard-inset, 0px) + var(--drawer-viewport-offset-top, 0px))
   );
   transition: transform 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1));
+}
+.drawer-footer-actions {
+  display: grid;
+  gap: 12px;
 }
 .history-summary {
   display: flex;
