@@ -28,6 +28,7 @@ export function GroceryApp() {
   const [toast, setToast] = useState('')
   const [online, setOnline] = useState(navigator.onLine)
   const [realtime, setRealtime] = useState('connecting')
+  const [showConnectionWarning, setShowConnectionWarning] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const products = useQuery({
     queryKey: ['products'],
@@ -36,6 +37,8 @@ export function GroceryApp() {
     staleTime: 0,
     gcTime: 0
   })
+  const connectionWarningEligible =
+    !products.isLoading && !products.isError && (!online || realtime === 'disconnected')
 
   useEffect(() => {
     const online = () => {
@@ -76,6 +79,14 @@ export function GroceryApp() {
       void channel.unsubscribe()
     }
   }, [client])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setShowConnectionWarning(connectionWarningEligible),
+      connectionWarningEligible ? 1800 : 0
+    )
+    return () => window.clearTimeout(timeout)
+  }, [connectionWarningEligible])
 
   const list = useMemo(() => products.data ?? [], [products.data])
   const scored = useMemo(() => searchProducts(list, search), [list, search])
@@ -232,7 +243,7 @@ export function GroceryApp() {
             <Plus weight="bold" />
           </button>
         </div>
-        {(!online || realtime === 'disconnected') && (
+        {connectionWarningEligible && showConnectionWarning && (
           <button
             className="connection-banner"
             onClick={() => {
