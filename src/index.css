@@ -562,7 +562,7 @@ body::before {
   width: 64px;
   height: 42px;
   padding: 0 8px;
-  border: 1px solid oklch(0.84 0.015 255);
+  border: 0;
   border-radius: 13px;
   outline: 0;
   background: oklch(0.92 0.012 255);
