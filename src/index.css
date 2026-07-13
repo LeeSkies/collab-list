@@ -674,7 +674,6 @@ body::before {
   align-items: flex-end;
   justify-content: center;
   padding-top: 24px;
-  padding-bottom: var(--drawer-keyboard-inset, 0px);
   touch-action: none;
 }
 .drawer-popup {
@@ -684,7 +683,7 @@ body::before {
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(620px, 100%);
   height: var(--drawer-height);
-  max-height: calc(100svh - 24px - var(--drawer-keyboard-inset, 0px));
+  max-height: calc(100svh - 24px);
   overflow: hidden;
   border-radius: 24px 24px 0 0;
   outline: 0;
