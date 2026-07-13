@@ -1,0 +1,87 @@
+import { Minus, Plus, ShoppingBagOpen } from '@phosphor-icons/react'
+import { motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { quantityCanAdjust } from '../lib/product'
+import type { Product } from '../lib/types'
+
+export function ProductRow({
+  product,
+  duplicatePulse,
+  onEdit,
+  onAdjust,
+  onToggle
+}: {
+  product: Product
+  duplicatePulse: boolean
+  onEdit(): void
+  onAdjust(delta: 1 | -1): void
+  onToggle(): void
+}) {
+  const { t, i18n } = useTranslation()
+  const reduced = useReducedMotion()
+  const x = useMotionValue(0)
+  const direction = i18n.dir() === 'rtl' ? -1 : 1
+  const progress = useTransform(x, [0, direction * 92], [0, 1])
+  const backgroundOpacity = useTransform(progress, [0, 1], [0, 1])
+  const [crossed, setCrossed] = useState(false)
+
+  return (
+    <motion.li layout className={`product-wrap ${duplicatePulse ? 'duplicate-pulse' : ''}`}>
+      <motion.div className="swipe-reveal" style={{ opacity: backgroundOpacity }}>
+        <ShoppingBagOpen weight="fill" />
+        <span>{product.is_picked ? t('restore') : t('pick')}</span>
+      </motion.div>
+      <motion.article
+        className={`product-row ${product.is_picked ? 'is-picked' : ''}`}
+        style={{ x }}
+        drag={reduced ? false : 'x'}
+        dragConstraints={{ left: direction < 0 ? -104 : 0, right: direction > 0 ? 104 : 0 }}
+        dragElastic={0.08}
+        onDrag={(_, info) => setCrossed(info.offset.x * direction >= 76)}
+        onDragEnd={(_, info) => {
+          if (info.offset.x * direction >= 76) onToggle()
+          setCrossed(false)
+        }}
+        animate={duplicatePulse ? { x: [0, -5, 5, -3, 3, 0] } : undefined}
+        transition={{ duration: 0.28, ease: [0.2, 0, 0, 1] }}
+        data-threshold={crossed || undefined}
+      >
+        <button
+          className="product-main"
+          onClick={onEdit}
+          aria-label={t('edit', { name: product.name })}
+        >
+          <strong>{product.name}</strong>
+          {product.notes && <span>{product.notes}</span>}
+        </button>
+        <div className="quantity-controls" onPointerDown={(event) => event.stopPropagation()}>
+          <button
+            aria-label={t('minus')}
+            disabled={!quantityCanAdjust(product.quantity, -1)}
+            onClick={() => onAdjust(-1)}
+          >
+            <Minus weight="bold" />
+          </button>
+          <button
+            className="quantity-value"
+            aria-label={`${t('quantity')}: ${product.quantity}`}
+            onClick={onEdit}
+          >
+            {product.quantity}
+          </button>
+          <button
+            aria-label={t('plus')}
+            disabled={!quantityCanAdjust(product.quantity, 1)}
+            onClick={() => onAdjust(1)}
+          >
+            <Plus weight="bold" />
+          </button>
+        </div>
+        <button className="sr-only" onClick={onToggle}>
+          {product.is_picked ? t('restore') : t('pick')}
+        </button>
+      </motion.article>
+    </motion.li>
+  )
+}

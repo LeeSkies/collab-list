@@ -1,0 +1,22 @@
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.vite/
+.spec-workflow/
+prototypes/
+
+# Supabase local runtime state
+supabase/.branches/
+supabase/.temp/
+
+# Editor and OS files
+.DS_Store
+*.swp
