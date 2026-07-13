@@ -6,7 +6,7 @@ import { useAuth } from '../auth'
 import { api } from '../lib/api'
 import type { AdminUser } from '../lib/types'
 import { Button } from './ui/button'
-import { ConfirmDialog, Sheet } from './sheet'
+import { AppDrawer, ConfirmDialog } from './drawer'
 
 export function AdminDrawer({
   open,
@@ -43,7 +43,12 @@ export function AdminDrawer({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange} title={t('users')} className="admin-sheet">
+      <AppDrawer
+        open={open}
+        onOpenChange={onOpenChange}
+        title={t('users')}
+        className="admin-drawer"
+      >
         <form className="admin-create" onSubmit={submit}>
           <div className="section-title">
             <UserPlus />
@@ -89,7 +94,7 @@ export function AdminDrawer({
             </article>
           ))}
         </div>
-      </Sheet>
+      </AppDrawer>
       {removeUser && (
         <ConfirmDialog
           open

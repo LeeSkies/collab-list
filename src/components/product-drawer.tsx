@@ -12,8 +12,8 @@ import {
   validateQuantity
 } from '../lib/product'
 import type { PickHistory, Product } from '../lib/types'
+import { AppDrawer, ConfirmDialog } from './drawer'
 import { Button } from './ui/button'
-import { ConfirmDialog, Sheet } from './sheet'
 
 export function ProductDrawer({
   product,
@@ -55,6 +55,7 @@ export function ProductDrawer({
     enabled: open
   })
   const latestPick = history.data?.[0]
+  const formId = `product-form-${product.id}`
 
   const dirty = JSON.stringify(values) !== JSON.stringify(initial)
   const validation = useMemo(() => {
@@ -91,13 +92,12 @@ export function ProductDrawer({
 
   return (
     <>
-      <Sheet
+      <AppDrawer
         open={open}
         onOpenChange={requestClose}
         title={t('edit', { name: product.name })}
-        className="product-sheet"
-      >
-        <div className="drawer-tools">
+        className="product-drawer"
+        headerAction={
           <button
             className="icon-button danger-quiet"
             onClick={() => setDeleteOpen(true)}
@@ -105,7 +105,29 @@ export function ProductDrawer({
           >
             <Trash />
           </button>
-        </div>
+        }
+        footer={
+          <Button
+            className="drawer-save"
+            type="submit"
+            form={formId}
+            size="lg"
+            disabled={!dirty || Boolean(validation) || pending}
+          >
+            {pending ? t('saving') : t('save')}
+          </Button>
+        }
+        nested={
+          <HistoryDrawer
+            product={product}
+            entries={history.data}
+            isLoading={history.isLoading}
+            isError={history.isError}
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+          />
+        }
+      >
         <div className="history-summary">
           <span>
             {history.isLoading
@@ -127,7 +149,7 @@ export function ProductDrawer({
             <ListBullets weight="bold" />
           </button>
         </div>
-        <form className="drawer-form" onSubmit={submit}>
+        <form id={formId} className="drawer-form" onSubmit={submit}>
           <label>
             <span>{t('appName').includes('ה') ? 'שם המוצר' : 'Product name'}</span>
             <input
@@ -169,24 +191,8 @@ export function ProductDrawer({
           <Button type="button" variant="secondary" size="lg" onClick={() => onToggle(product)}>
             {product.is_picked ? t('restore') : t('pick')}
           </Button>
-          <Button
-            className="drawer-save"
-            type="submit"
-            size="lg"
-            disabled={!dirty || Boolean(validation) || pending}
-          >
-            {pending ? t('saving') : t('save')}
-          </Button>
         </form>
-      </Sheet>
-      <HistoryDrawer
-        product={product}
-        entries={history.data}
-        isLoading={history.isLoading}
-        isError={history.isError}
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
-      />
+      </AppDrawer>
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -231,12 +237,12 @@ function HistoryDrawer({
 }) {
   const { t } = useTranslation()
   return (
-    <Sheet
+    <AppDrawer
       open={open}
       onOpenChange={onOpenChange}
       title={t('history')}
       description={product.name}
-      className="history-sheet"
+      className="history-drawer"
     >
       <div className="history-list">
         {isLoading ? (
@@ -260,7 +266,7 @@ function HistoryDrawer({
           <p className="empty-note">{t('noHistory')}</p>
         )}
       </div>
-    </Sheet>
+    </AppDrawer>
   )
 }
 

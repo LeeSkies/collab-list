@@ -629,7 +629,8 @@ body::before {
   }
 }
 
-.sheet-backdrop {
+.drawer-backdrop,
+.dialog-backdrop {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -638,45 +639,75 @@ body::before {
   opacity: 1;
   transition: opacity 180ms ease-out;
 }
-.sheet-backdrop[data-ending-style] {
+.drawer-backdrop {
+  opacity: calc(1 - var(--drawer-swipe-progress, 0));
+}
+.drawer-backdrop[data-starting-style],
+.drawer-backdrop[data-ending-style],
+.dialog-backdrop[data-starting-style],
+.dialog-backdrop[data-ending-style] {
   opacity: 0;
 }
-.sheet-viewport {
+.drawer-viewport {
   position: fixed;
   inset: 0;
   z-index: 51;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding-top: 40px;
+  padding-top: 24px;
+  touch-action: none;
 }
-.sheet-popup {
+.drawer-popup {
+  --drawer-height: min(720px, calc(100svh - 24px));
   position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(620px, 100%);
-  max-height: calc(100svh - 32px);
-  overflow: auto;
-  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  height: var(--drawer-height);
+  max-height: calc(100svh - 24px);
+  overflow: hidden;
   border-radius: 24px 24px 0 0;
+  outline: 0;
   background: var(--card);
   box-shadow: 0 -16px 50px rgb(22 34 25/0.13);
-  transform: translateY(0);
+  transform: translateY(var(--drawer-swipe-movement-y, 0px));
   transition: transform 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1));
+  touch-action: none;
 }
-.sheet-popup[data-ending-style] {
-  transform: translateY(100%);
+.drawer-popup[data-swiping] {
+  transition-duration: 0ms;
+  user-select: none;
 }
-.sheet-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
+.drawer-popup[data-starting-style],
+.drawer-popup[data-ending-style] {
+  transform: translateY(calc(100% + 2px));
 }
-.sheet-heading > div {
+.drawer-heading {
+  padding: 10px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  touch-action: none;
+  user-select: none;
+}
+.drawer-handle {
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 8px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.drawer-heading-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.drawer-heading-row > div:first-child {
   min-width: 0;
-  flex: 1;
 }
-.sheet-heading h2 {
+.drawer-heading h2 {
   margin: 0;
   overflow: hidden;
   font-size: 20px;
@@ -684,18 +715,32 @@ body::before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sheet-heading p {
+.drawer-heading p {
   margin: 4px 0 0;
   color: var(--muted-foreground);
   font-size: 12px;
 }
-.drawer-tools {
+.drawer-heading-actions {
   display: flex;
-  justify-content: flex-end;
-  margin: -10px 0 8px;
+  align-items: center;
+  gap: 2px;
 }
-.drawer-tools button {
-  background: var(--muted);
+.drawer-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 20px 20px;
+  touch-action: pan-y;
+}
+.drawer-footer {
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom) + var(--drawer-keyboard-inset, 0px));
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  transition-property: padding-bottom;
+  transition-duration: 220ms;
+}
+.history-drawer {
+  --drawer-height: min(620px, calc(100svh - 24px));
 }
 .history-summary {
   display: flex;
@@ -749,7 +794,6 @@ body::before {
 .drawer-save {
   width: 100%;
   min-height: 48px;
-  margin-top: 4px;
 }
 .drawer-form > button:nth-last-child(2) {
   min-height: 44px;
@@ -924,13 +968,8 @@ body::before {
   .list-surface {
     padding: 18px;
   }
-  .sheet-viewport {
-    align-items: center;
-    padding: 30px;
-  }
-  .sheet-popup {
-    border-radius: 24px;
-    max-height: calc(100svh - 60px);
+  .drawer-viewport {
+    padding-inline: 30px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, describe, expect, it } from 'vitest'
 import i18n from '../i18n'
-import { ConfirmDialog } from './sheet'
+import { AppDrawer, ConfirmDialog } from './drawer'
 
 afterEach(async () => {
   await i18n.changeLanguage('en')
@@ -26,5 +26,28 @@ describe('ConfirmDialog', () => {
     )
 
     expect(screen.getByRole('button', { name: 'ביטול' })).toBeVisible()
+  })
+})
+
+describe('AppDrawer', () => {
+  it('separates the fixed header, scrollable content, and footer', () => {
+    render(
+      <I18nextProvider i18n={i18n}>
+        <AppDrawer
+          open
+          onOpenChange={() => undefined}
+          title="Product"
+          footer={<button>Save</button>}
+        >
+          <p>Drawer content</p>
+        </AppDrawer>
+      </I18nextProvider>
+    )
+
+    expect(screen.getByRole('heading', { name: 'Product' })).toBeVisible()
+    expect(screen.getByText('Drawer content').closest('.drawer-content')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Save' }).closest('.drawer-footer')
+    ).toBeInTheDocument()
   })
 })
