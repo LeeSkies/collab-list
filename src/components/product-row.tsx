@@ -1,23 +1,22 @@
 import { ArrowCounterClockwise, Check, Minus, Plus } from '@phosphor-icons/react'
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
-import { useState } from 'react'
+import { forwardRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { quantityCanAdjust } from '../lib/product'
 import type { Product } from '../lib/types'
 
-export function ProductRow({
-  product,
-  duplicatePulse,
-  onEdit,
-  onAdjust,
-  onToggle
-}: {
+interface ProductRowProps {
   product: Product
   duplicatePulse: boolean
   onEdit(): void
   onAdjust(delta: 1 | -1): void
   onToggle(): void
-}) {
+}
+
+export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function ProductRow(
+  { product, duplicatePulse, onEdit, onAdjust, onToggle },
+  ref
+) {
   const { t, i18n } = useTranslation()
   const reduced = useReducedMotion()
   const x = useMotionValue(0)
@@ -29,6 +28,7 @@ export function ProductRow({
 
   return (
     <motion.li
+      ref={ref}
       layout
       data-product-id={product.id}
       className={`product-wrap ${duplicatePulse ? 'duplicate-pulse' : ''}`}
@@ -116,4 +116,4 @@ export function ProductRow({
       </motion.article>
     </motion.li>
   )
-}
+})

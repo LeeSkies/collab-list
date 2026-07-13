@@ -360,7 +360,7 @@ function ProductSection({
         </h2>
       )}
       <motion.ul layout>
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} mode="popLayout">
           {products.map((product) => (
             <ProductRow
               key={product.id}
