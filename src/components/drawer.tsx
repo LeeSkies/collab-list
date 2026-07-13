@@ -26,7 +26,7 @@ export function AppDrawer({
   className?: string
 }) {
   const { t } = useTranslation()
-  const viewportOffsetTop = useKeyboardViewportOffsetTop(open)
+  const { viewportOffsetTop, contentGapCorrection, keyboardOpen } = useKeyboardLayoutOffsets(open)
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} swipeDirection="down">
       <Drawer.VirtualKeyboardProvider>
@@ -34,7 +34,13 @@ export function AppDrawer({
           <Drawer.Backdrop className="drawer-backdrop" />
           <Drawer.Viewport
             className="drawer-viewport"
-            style={{ '--drawer-viewport-offset-top': `${viewportOffsetTop}px` } as CSSProperties}
+            data-keyboard-open={keyboardOpen ? '' : undefined}
+            style={
+              {
+                '--drawer-viewport-offset-top': `${viewportOffsetTop}px`,
+                '--drawer-content-gap-correction': `${contentGapCorrection}px`
+              } as CSSProperties
+            }
           >
             <Drawer.Popup className={`drawer-popup ${className}`}>
               <header className="drawer-heading">
@@ -63,8 +69,12 @@ export function AppDrawer({
   )
 }
 
-function useKeyboardViewportOffsetTop(open: boolean) {
-  const [offsetTop, setOffsetTop] = useState(0)
+function useKeyboardLayoutOffsets(open: boolean) {
+  const [offsets, setOffsets] = useState({
+    viewportOffsetTop: 0,
+    contentGapCorrection: 0,
+    keyboardOpen: false
+  })
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -77,11 +87,14 @@ function useKeyboardViewportOffsetTop(open: boolean) {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
         const keyboardOpen = window.innerHeight - viewport.height > 60
-        setOffsetTop(
+        const toolbarOffset = keyboardOpen ? getBraveBottomToolbarOffset() : 0
+        setOffsets({
+          viewportOffsetTop: keyboardOpen
+            ? Math.max(0, Math.ceil(viewport.offsetTop + toolbarOffset))
+            : 0,
+          contentGapCorrection: Math.max(0, toolbarOffset - 16),
           keyboardOpen
-            ? Math.max(0, Math.ceil(viewport.offsetTop + getBraveBottomToolbarOffset()))
-            : 0
-        )
+        })
       })
     }
 
@@ -95,7 +108,7 @@ function useKeyboardViewportOffsetTop(open: boolean) {
     }
   }, [open])
 
-  return open ? offsetTop : 0
+  return open ? offsets : { viewportOffsetTop: 0, contentGapCorrection: 0, keyboardOpen: false }
 }
 
 function getBraveBottomToolbarOffset() {
@@ -104,6 +117,7 @@ function getBraveBottomToolbarOffset() {
     userAgentData?: { brands?: { brand: string }[] }
   }
   const isAndroid = /Android/i.test(browserNavigator.userAgent)
+  const isBrowserTab = window.matchMedia('(display-mode: browser)').matches
   const isBrave =
     Boolean(browserNavigator.brave) ||
     browserNavigator.userAgentData?.brands?.some(({ brand }) => brand === 'Brave')
@@ -111,7 +125,7 @@ function getBraveBottomToolbarOffset() {
   // Brave on Android hides its 48px bottom toolbar for the keyboard but, on some
   // devices, leaves that toolbar subtracted from visualViewport.height. Compensate
   // for the stale geometry so the drawer footer meets the real keyboard edge.
-  return isAndroid && isBrave ? 48 : 0
+  return isAndroid && isBrowserTab && isBrave ? 48 : 0
 }
 
 export function ConfirmDialog({
