@@ -70,7 +70,7 @@ input,
 textarea {
   font: inherit;
 }
-button {
+button:not([data-slot='button']) {
   color: inherit;
 }
 button:not(:disabled) {
@@ -460,7 +460,7 @@ body::before {
   inset: 0;
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: flex-end;
   padding-inline: 20px;
   background: color-mix(in oklab, var(--primary), white 72%);
   color: var(--primary);
@@ -468,7 +468,8 @@ body::before {
   font-weight: 800;
 }
 .swipe-reveal svg {
-  width: 21px;
+  width: 23px;
+  height: 23px;
 }
 .product-row {
   position: relative;
@@ -560,6 +561,21 @@ body::before {
   min-width: 38px;
   font-size: 13px;
   font-weight: 850;
+}
+.quantity-readonly {
+  width: 64px;
+  height: 42px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in oklab, var(--input), transparent 25%);
+  border-radius: 13px;
+  outline: 0;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
 }
 .picked-divider {
   display: grid;
@@ -660,10 +676,17 @@ body::before {
   gap: 16px;
   margin-bottom: 22px;
 }
+.sheet-heading > div {
+  min-width: 0;
+  flex: 1;
+}
 .sheet-heading h2 {
   margin: 0;
+  overflow: hidden;
   font-size: 20px;
   letter-spacing: -0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sheet-heading p {
   margin: 4px 0 0;
@@ -671,15 +694,12 @@ body::before {
   font-size: 12px;
 }
 .drawer-tools {
-  position: absolute;
-  inset-block-start: 18px;
-  inset-inline: 64px;
   display: flex;
   justify-content: space-between;
-  pointer-events: none;
+  margin: -10px 0 16px;
 }
 .drawer-tools button {
-  pointer-events: auto;
+  background: var(--muted);
 }
 .last-picked {
   margin: -10px 0 18px;
@@ -737,6 +757,7 @@ body::before {
 .history-list article > div {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 .history-list strong {
   font-size: 13px;
@@ -745,6 +766,11 @@ body::before {
 .history-list time {
   color: var(--muted-foreground);
   font-size: 11px;
+}
+.history-list article > div span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .history-avatar {
   display: grid;
@@ -781,6 +807,8 @@ body::before {
 .confirm-popup h2 {
   margin: 0 0 8px;
   font-size: 19px;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 .confirm-popup p {
   margin: 0;
@@ -837,11 +865,13 @@ body::before {
   overflow: hidden;
   font-size: 13px;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .user-list span {
   color: var(--muted-foreground);
   font-size: 11px;
 }
+.app-toast,
 .update-toast {
   position: fixed;
   inset-inline: 16px;
@@ -859,6 +889,12 @@ body::before {
   color: var(--background);
   box-shadow: 0 14px 40px rgb(0 0 0/0.18);
   font-size: 12px;
+}
+.app-toast {
+  justify-content: center;
+  min-height: 46px;
+  text-align: center;
+  font-weight: 700;
 }
 .update-toast button {
   padding: 7px 10px;

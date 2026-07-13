@@ -25,7 +25,8 @@ export function GroceryApp() {
   const [selected, setSelected] = useState<Product | null>(null)
   const [adminOpen, setAdminOpen] = useState(false)
   const [duplicatePulse, setDuplicatePulse] = useState('')
-  const [message, setMessage] = useState('')
+  const [toast, setToast] = useState('')
+  const [online, setOnline] = useState(navigator.onLine)
   const [realtime, setRealtime] = useState('connecting')
   const searchRef = useRef<HTMLInputElement>(null)
   const products = useQuery({
@@ -38,10 +39,11 @@ export function GroceryApp() {
 
   useEffect(() => {
     const online = () => {
-      setMessage(t('connected'))
+      setOnline(true)
+      setToast(t('connected'))
       void client.invalidateQueries({ queryKey: ['products'] })
     }
-    const offline = () => setMessage(t('offline'))
+    const offline = () => setOnline(false)
     addEventListener('online', online)
     addEventListener('offline', offline)
     return () => {
@@ -49,6 +51,12 @@ export function GroceryApp() {
       removeEventListener('offline', offline)
     }
   }, [client, t])
+
+  useEffect(() => {
+    if (!toast) return
+    const timeout = window.setTimeout(() => setToast(''), 3200)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
 
   useEffect(() => {
     const channel = api.realtime.subscribe(
@@ -87,7 +95,7 @@ export function GroceryApp() {
   const canCreate = Boolean(normalizeText(search)) && !duplicate
 
   function mutationError(reason: unknown) {
-    setMessage(
+    setToast(
       reason instanceof ApiError
         ? reason.code === '23505'
           ? t('duplicate')
@@ -184,7 +192,7 @@ export function GroceryApp() {
   function activateCreate() {
     if (duplicate) {
       setDuplicatePulse(duplicate.id)
-      setMessage(t('duplicate'))
+      setToast(t('duplicate'))
       setTimeout(() => setDuplicatePulse(''), 520)
       document
         .querySelector(`[data-product-id="${duplicate.id}"]`)
@@ -224,16 +232,15 @@ export function GroceryApp() {
             <Plus weight="bold" />
           </button>
         </div>
-        {(message || realtime !== 'connected') && (
+        {(!online || realtime === 'disconnected') && (
           <button
             className="connection-banner"
             onClick={() => {
-              setMessage('')
               void products.refetch()
             }}
           >
             <WifiSlash />
-            {message || t('reconnecting')}
+            {online ? t('reconnecting') : t('offline')}
           </button>
         )}
         {products.isLoading ? (
@@ -288,8 +295,28 @@ export function GroceryApp() {
       {auth.profile?.role === 'admin' && (
         <AdminDrawer open={adminOpen} onOpenChange={setAdminOpen} />
       )}
+      <AppToast message={toast} />
       <PwaUpdate />
     </main>
+  )
+}
+
+function AppToast({ message }: { message: string }) {
+  return (
+    <AnimatePresence initial={false}>
+      {message && (
+        <motion.aside
+          className="app-toast"
+          role="status"
+          initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
+          transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+        >
+          {message}
+        </motion.aside>
+      )}
+    </AnimatePresence>
   )
 }
 

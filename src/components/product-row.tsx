@@ -1,4 +1,4 @@
-import { Minus, Plus, ShoppingBagOpen } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, Check, Minus, Plus } from '@phosphor-icons/react'
 import { motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -21,7 +21,7 @@ export function ProductRow({
   const { t, i18n } = useTranslation()
   const reduced = useReducedMotion()
   const x = useMotionValue(0)
-  const direction = i18n.dir() === 'rtl' ? -1 : 1
+  const direction = i18n.dir() === 'rtl' ? 1 : -1
   const progress = useTransform(x, [0, direction * 92], [0, 1])
   const backgroundOpacity = useTransform(progress, [0, 1], [0, 1])
   const [crossed, setCrossed] = useState(false)
@@ -29,8 +29,7 @@ export function ProductRow({
   return (
     <motion.li layout className={`product-wrap ${duplicatePulse ? 'duplicate-pulse' : ''}`}>
       <motion.div className="swipe-reveal" style={{ opacity: backgroundOpacity }}>
-        <ShoppingBagOpen weight="fill" />
-        <span>{product.is_picked ? t('restore') : t('pick')}</span>
+        {product.is_picked ? <ArrowCounterClockwise weight="bold" /> : <Check weight="bold" />}
       </motion.div>
       <motion.article
         className={`product-row ${product.is_picked ? 'is-picked' : ''}`}
@@ -55,29 +54,40 @@ export function ProductRow({
           <strong>{product.name}</strong>
           {product.notes && <span>{product.notes}</span>}
         </button>
-        <div className="quantity-controls" onPointerDown={(event) => event.stopPropagation()}>
-          <button
-            aria-label={t('minus')}
-            disabled={!quantityCanAdjust(product.quantity, -1)}
-            onClick={() => onAdjust(-1)}
-          >
-            <Minus weight="bold" />
-          </button>
-          <button
-            className="quantity-value"
+        {product.is_picked ? (
+          <input
+            className="quantity-readonly"
             aria-label={`${t('quantity')}: ${product.quantity}`}
+            value={product.quantity}
+            readOnly
             onClick={onEdit}
-          >
-            {product.quantity}
-          </button>
-          <button
-            aria-label={t('plus')}
-            disabled={!quantityCanAdjust(product.quantity, 1)}
-            onClick={() => onAdjust(1)}
-          >
-            <Plus weight="bold" />
-          </button>
-        </div>
+            onPointerDown={(event) => event.stopPropagation()}
+          />
+        ) : (
+          <div className="quantity-controls" onPointerDown={(event) => event.stopPropagation()}>
+            <button
+              aria-label={t('minus')}
+              disabled={!quantityCanAdjust(product.quantity, -1)}
+              onClick={() => onAdjust(-1)}
+            >
+              <Minus weight="bold" />
+            </button>
+            <button
+              className="quantity-value"
+              aria-label={`${t('quantity')}: ${product.quantity}`}
+              onClick={onEdit}
+            >
+              {product.quantity}
+            </button>
+            <button
+              aria-label={t('plus')}
+              disabled={!quantityCanAdjust(product.quantity, 1)}
+              onClick={() => onAdjust(1)}
+            >
+              <Plus weight="bold" />
+            </button>
+          </div>
+        )}
         <button className="sr-only" onClick={onToggle}>
           {product.is_picked ? t('restore') : t('pick')}
         </button>
