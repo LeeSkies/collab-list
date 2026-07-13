@@ -15,7 +15,6 @@ const resources = {
   en: {
     translation: {
       appName: 'Our groceries',
-      tagline: 'One list, shared together.',
       login: 'Sign in',
       email: 'Email',
       password: 'Password',
@@ -95,7 +94,6 @@ const resources = {
   he: {
     translation: {
       appName: 'הקניות שלנו',
-      tagline: 'רשימה אחת, לכולם.',
       login: 'כניסה',
       email: 'אימייל',
       password: 'סיסמה',

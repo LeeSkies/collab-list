@@ -383,10 +383,7 @@ function AppHeader({ onAdmin }: { onAdmin(): void }) {
     <header className="app-header">
       <div>
         <span className="mini-leaf" />
-        <div>
-          <p>{t('tagline')}</p>
-          <h1>{t('appName')}</h1>
-        </div>
+        <h1>{t('appName')}</h1>
       </div>
       <nav>
         {auth.profile?.role === 'admin' && (

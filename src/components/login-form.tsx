@@ -33,7 +33,6 @@ export function LoginForm() {
         <span />
       </div>
       <section className="login-card">
-        <p className="kicker">{t('tagline')}</p>
         <h1>{t('appName')}</h1>
         <form onSubmit={submit}>
           <label>

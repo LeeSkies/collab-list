@@ -223,11 +223,6 @@ body::before {
   letter-spacing: -0.045em;
   text-wrap: balance;
 }
-.kicker {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: 13px;
-}
 .login-card form,
 .drawer-form,
 .admin-create {
@@ -296,14 +291,8 @@ body::before {
   align-items: center;
   gap: 12px;
 }
-.app-header p {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: 11px;
-  font-weight: 650;
-}
 .app-header h1 {
-  margin: 1px 0 0;
+  margin: 0;
   font-size: 25px;
   letter-spacing: -0.04em;
 }
