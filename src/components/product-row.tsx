@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, Check, Minus, Plus } from '@phosphor-icons/react'
-import { motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
+import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { quantityCanAdjust } from '../lib/product'
@@ -27,7 +27,15 @@ export function ProductRow({
   const [crossed, setCrossed] = useState(false)
 
   return (
-    <motion.li layout className={`product-wrap ${duplicatePulse ? 'duplicate-pulse' : ''}`}>
+    <motion.li
+      layout
+      data-product-id={product.id}
+      className={`product-wrap ${duplicatePulse ? 'duplicate-pulse' : ''}`}
+      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 6, scale: 0.98 }}
+      transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+    >
       <motion.div className="swipe-reveal" style={{ opacity: backgroundOpacity }}>
         {product.is_picked ? <ArrowCounterClockwise weight="bold" /> : <Check weight="bold" />}
       </motion.div>
@@ -39,7 +47,14 @@ export function ProductRow({
         dragElastic={0.08}
         onDrag={(_, info) => setCrossed(info.offset.x * direction >= 76)}
         onDragEnd={(_, info) => {
-          if (info.offset.x * direction >= 76) onToggle()
+          if (info.offset.x * direction >= 76) {
+            setCrossed(false)
+            void animate(x, direction * (window.innerWidth + 120), {
+              duration: 0.22,
+              ease: [0.2, 0, 0, 1]
+            }).then(onToggle)
+            return
+          }
           setCrossed(false)
         }}
         animate={duplicatePulse ? { x: [0, -5, 5, -3, 3, 0] } : undefined}

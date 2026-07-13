@@ -38,8 +38,8 @@ function renderRow(overrides: Partial<Product> = {}) {
 describe('ProductRow', () => {
   it('shows quantity controls for an unpicked product', () => {
     renderRow()
-    expect(screen.getByRole('button', { name: i18n.t('minus') })).toBeVisible()
-    expect(screen.getByRole('button', { name: i18n.t('plus') })).toBeVisible()
+    expect(screen.getByRole('button', { name: i18n.t('minus') })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: i18n.t('plus') })).toBeInTheDocument()
   })
 
   it('shows a read-only quantity input without controls for a picked product', () => {

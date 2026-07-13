@@ -218,74 +218,78 @@ export function GroceryApp() {
     <main className="app-shell">
       <AppHeader onAdmin={() => setAdminOpen(true)} />
       <section className="list-surface">
-        <div className="search-shell">
-          <MagnifyingGlass />
-          <input
-            ref={searchRef}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') activateCreate()
-            }}
-            placeholder={t('search')}
-            aria-label={t('search')}
-          />
-          <button
-            aria-disabled={!canCreate}
-            aria-label={
-              canCreate
-                ? t('create', { name: search })
-                : duplicate
-                  ? t('duplicate')
-                  : t('create', { name: '' })
-            }
-            onClick={activateCreate}
-          >
-            <Plus weight="bold" />
-          </button>
+        <div className="list-toolbar">
+          <div className="search-shell">
+            <MagnifyingGlass />
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') activateCreate()
+              }}
+              placeholder={t('search')}
+              aria-label={t('search')}
+            />
+            <button
+              aria-disabled={!canCreate}
+              aria-label={
+                canCreate
+                  ? t('create', { name: search })
+                  : duplicate
+                    ? t('duplicate')
+                    : t('create', { name: '' })
+              }
+              onClick={activateCreate}
+            >
+              <Plus weight="bold" />
+            </button>
+          </div>
+          {connectionWarningEligible && showConnectionWarning && (
+            <button
+              className="connection-banner"
+              onClick={() => {
+                void products.refetch()
+              }}
+            >
+              <WifiSlash />
+              {online ? t('reconnecting') : t('offline')}
+            </button>
+          )}
         </div>
-        {connectionWarningEligible && showConnectionWarning && (
-          <button
-            className="connection-banner"
-            onClick={() => {
-              void products.refetch()
-            }}
-          >
-            <WifiSlash />
-            {online ? t('reconnecting') : t('offline')}
-          </button>
-        )}
-        {products.isLoading ? (
-          <ListSkeleton />
-        ) : products.isError ? (
-          <ErrorState onRetry={() => products.refetch()} />
-        ) : (
-          <LayoutGroup>
-            <ProductSection
-              title={t('unpicked')}
-              products={unpicked}
-              duplicatePulse={duplicatePulse}
-              onEdit={setSelected}
-              onAdjust={(product, delta) => adjust.mutate({ product, delta })}
-              onToggle={(product) => toggle.mutate(product)}
-            />
-            <div className="picked-divider">
-              <span />
-              {t('picked')}
-              <span />
-            </div>
-            <ProductSection
-              title=""
-              products={picked}
-              duplicatePulse={duplicatePulse}
-              onEdit={setSelected}
-              onAdjust={(product, delta) => adjust.mutate({ product, delta })}
-              onToggle={(product) => toggle.mutate(product)}
-            />
-            {list.length === 0 && <p className="empty-state">{t('empty')}</p>}
-            {search && filtered.length === 0 && <p className="empty-state">{t('noMatches')}</p>}
-          </LayoutGroup>
-        )}
+        <div className="product-scroll">
+          {products.isLoading ? (
+            <ListSkeleton />
+          ) : products.isError ? (
+            <ErrorState onRetry={() => products.refetch()} />
+          ) : (
+            <LayoutGroup>
+              <ProductSection
+                title={t('unpicked')}
+                products={unpicked}
+                duplicatePulse={duplicatePulse}
+                onEdit={setSelected}
+                onAdjust={(product, delta) => adjust.mutate({ product, delta })}
+                onToggle={(product) => toggle.mutate(product)}
+              />
+              <div className="picked-divider">
+                <span />
+                {t('picked')}
+                <span />
+              </div>
+              <ProductSection
+                title=""
+                products={picked}
+                duplicatePulse={duplicatePulse}
+                onEdit={setSelected}
+                onAdjust={(product, delta) => adjust.mutate({ product, delta })}
+                onToggle={(product) => toggle.mutate(product)}
+              />
+              {list.length === 0 && <p className="empty-state">{t('empty')}</p>}
+              {search && filtered.length === 0 && <p className="empty-state">{t('noMatches')}</p>}
+            </LayoutGroup>
+          )}
+        </div>
       </section>
       {selected && (
         <ProductDrawer
@@ -358,15 +362,14 @@ function ProductSection({
       <motion.ul layout>
         <AnimatePresence initial={false}>
           {products.map((product) => (
-            <div key={product.id} data-product-id={product.id}>
-              <ProductRow
-                product={product}
-                duplicatePulse={duplicatePulse === product.id}
-                onEdit={() => onEdit(product)}
-                onAdjust={(delta) => onAdjust(product, delta)}
-                onToggle={() => onToggle(product)}
-              />
-            </div>
+            <ProductRow
+              key={product.id}
+              product={product}
+              duplicatePulse={duplicatePulse === product.id}
+              onEdit={() => onEdit(product)}
+              onAdjust={(delta) => onAdjust(product, delta)}
+              onToggle={() => onToggle(product)}
+            />
           ))}
         </AnimatePresence>
       </motion.ul>

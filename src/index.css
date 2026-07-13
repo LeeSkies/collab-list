@@ -276,10 +276,13 @@ body::before {
 }
 
 .app-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   width: min(760px, 100%);
-  min-height: 100svh;
+  height: 100svh;
   margin: auto;
   padding: max(20px, env(safe-area-inset-top)) 16px calc(38px + env(safe-area-inset-bottom));
+  overflow: hidden;
 }
 .app-header {
   display: flex;
@@ -352,11 +355,23 @@ body::before {
 }
 
 .list-surface {
-  min-height: 72svh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
   padding: 14px;
+  overflow: hidden;
   border-radius: 26px;
   background: color-mix(in oklab, var(--card), transparent 4%);
   box-shadow: var(--shadow);
+}
+.product-scroll {
+  min-height: 0;
+  margin-inline: -4px;
+  padding: 0 4px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 .search-shell {
   display: flex;
