@@ -32,7 +32,7 @@ describe('RestoreAllDialog', () => {
 
     await user.click(screen.getByRole('switch', { name: 'Clear notes' }))
     await user.click(screen.getByRole('switch', { name: 'Reset quantities to 1' }))
-    await user.click(screen.getByRole('button', { name: 'Restore all' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     expect(onConfirm).toHaveBeenCalledWith({ clearNotes: true, resetQuantities: true })
   })
@@ -44,7 +44,7 @@ describe('RestoreAllDialog', () => {
 
     expect(screen.getByRole('switch', { name: 'Clear notes' })).not.toBeChecked()
     expect(screen.getByRole('switch', { name: 'Reset quantities to 1' })).not.toBeChecked()
-    await user.click(screen.getByRole('button', { name: 'Restore all' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     expect(onConfirm).toHaveBeenCalledWith({ clearNotes: false, resetQuantities: false })
   })
@@ -54,5 +54,7 @@ describe('RestoreAllDialog', () => {
     renderDialog()
 
     expect(screen.getByRole('heading', { name: 'להחזיר את כל המוצרים שנקנו?' })).toBeVisible()
+    expect(screen.getByText('בחרו מהאפשרויות')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'אישור' })).toBeVisible()
   })
 })

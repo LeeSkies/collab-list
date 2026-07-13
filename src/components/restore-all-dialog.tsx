@@ -37,7 +37,7 @@ export function RestoreAllDialog({
       onOpenChange={changeOpen}
       title={t('restoreAllTitle')}
       body={t('restoreAllBody')}
-      confirmLabel={t('restoreAll')}
+      confirmLabel={t('confirm')}
       pending={pending}
       onConfirm={() => onConfirm({ clearNotes, resetQuantities })}
     >
