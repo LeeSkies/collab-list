@@ -21,6 +21,7 @@ export function ProductRow({
   const { t, i18n } = useTranslation()
   const reduced = useReducedMotion()
   const x = useMotionValue(0)
+  const opacity = useMotionValue(1)
   const direction = i18n.dir() === 'rtl' ? 1 : -1
   const progress = useTransform(x, [0, direction * 92], [0, 1])
   const backgroundOpacity = useTransform(progress, [0, 1], [0, 1])
@@ -31,17 +32,17 @@ export function ProductRow({
       layout
       data-product-id={product.id}
       className={`product-wrap ${duplicatePulse ? 'duplicate-pulse' : ''}`}
-      initial={{ opacity: 0, y: -6, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 6, scale: 0.98 }}
-      transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ type: 'spring', duration: 0.24, bounce: 0 }}
     >
       <motion.div className="swipe-reveal" style={{ opacity: backgroundOpacity }}>
         {product.is_picked ? <ArrowCounterClockwise weight="bold" /> : <Check weight="bold" />}
       </motion.div>
       <motion.article
         className={`product-row ${product.is_picked ? 'is-picked' : ''}`}
-        style={{ x }}
+        style={{ x, opacity }}
         drag={reduced ? false : 'x'}
         dragConstraints={{ left: direction < 0 ? -104 : 0, right: direction > 0 ? 104 : 0 }}
         dragElastic={0.08}
@@ -49,10 +50,16 @@ export function ProductRow({
         onDragEnd={(_, info) => {
           if (info.offset.x * direction >= 76) {
             setCrossed(false)
-            void animate(x, direction * (window.innerWidth + 120), {
-              duration: 0.22,
-              ease: [0.2, 0, 0, 1]
-            }).then(onToggle)
+            void Promise.all([
+              animate(x, direction * (window.innerWidth + 120), {
+                duration: 0.22,
+                ease: [0.2, 0, 0, 1]
+              }),
+              animate(opacity, 0.12, {
+                duration: 0.2,
+                ease: [0.2, 0, 0, 1]
+              })
+            ]).then(onToggle)
             return
           }
           setCrossed(false)
