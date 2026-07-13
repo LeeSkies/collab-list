@@ -1,6 +1,7 @@
 import { Dialog } from '@base-ui/react/dialog'
 import { X } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export function Sheet({
   open,
@@ -57,6 +58,7 @@ export function ConfirmDialog({
   onConfirm(): void
   destructive?: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -66,7 +68,7 @@ export function ConfirmDialog({
             <Dialog.Title>{title}</Dialog.Title>
             <Dialog.Description>{body}</Dialog.Description>
             <div className="confirm-actions">
-              <Dialog.Close className="button secondary">Cancel</Dialog.Close>
+              <Dialog.Close className="button secondary">{t('cancel')}</Dialog.Close>
               <button className={destructive ? 'button danger' : 'button'} onClick={onConfirm}>
                 {confirmLabel}
               </button>

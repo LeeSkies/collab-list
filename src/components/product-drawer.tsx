@@ -119,7 +119,6 @@ export function ProductDrawer({
               value={values.name}
               onChange={(event) => setValues({ ...values, name: event.target.value })}
               maxLength={PRODUCT_NAME_MAX * 2}
-              autoFocus
             />
           </label>
           <label>
