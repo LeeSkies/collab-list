@@ -667,6 +667,7 @@ body::before {
   opacity: 0;
 }
 .drawer-viewport {
+  --drawer-bleed: 3rem;
   position: fixed;
   inset: 0;
   z-index: 51;
@@ -676,9 +677,29 @@ body::before {
   padding-top: 24px;
   touch-action: none;
 }
+.drawer-viewport::after {
+  content: '';
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 0;
+  width: min(620px, 100%);
+  height: var(--drawer-bleed);
+  margin-inline: auto;
+  pointer-events: none;
+  background: var(--card);
+  opacity: 1;
+  transition: opacity 180ms ease-out;
+}
+.drawer-viewport[data-starting-style]::after,
+.drawer-viewport[data-ending-style]::after,
+.drawer-viewport:has(.drawer-popup[data-swiping])::after {
+  opacity: 0;
+}
 .drawer-popup {
   --drawer-height: min(720px, calc(100svh - 24px));
   position: relative;
+  z-index: 1;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(620px, 100%);
