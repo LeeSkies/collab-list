@@ -16,7 +16,7 @@ function renderTruncatedName() {
 }
 
 describe('HoldToRevealName', () => {
-  it('reveals a truncated name after holding and hides it on finger lift', () => {
+  it('reveals a truncated name after holding and starts an animated exit on finger lift', () => {
     const name = renderTruncatedName()
     fireEvent.pointerDown(name, {
       pointerId: 1,
@@ -29,7 +29,7 @@ describe('HoldToRevealName', () => {
 
     expect(screen.getByRole('tooltip')).toHaveTextContent('A deliberately very long product name')
     fireEvent.pointerUp(window, { pointerId: 1, clientX: 20, clientY: 20 })
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
   })
 
   it('cancels the long press when the finger moves like a swipe', () => {

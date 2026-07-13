@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 
 const HOLD_DELAY = 360
@@ -79,19 +79,24 @@ export function HoldToRevealName({ name, children }: { name: string; children?: 
       >
         {children ?? name}
       </span>
-      {revealed &&
-        createPortal(
-          <motion.div
-            className="held-name-reveal"
-            role="tooltip"
-            initial={reducedMotion ? false : { opacity: 0, y: -6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-          >
-            {name}
-          </motion.div>,
-          document.body
-        )}
+      {createPortal(
+        <AnimatePresence>
+          {revealed && (
+            <motion.div
+              key="held-name"
+              className="held-name-reveal"
+              role="tooltip"
+              initial={reducedMotion ? false : { opacity: 0, y: -6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+            >
+              {name}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   )
 }
