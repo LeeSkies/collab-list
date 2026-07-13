@@ -77,7 +77,11 @@ function useKeyboardViewportOffsetTop(open: boolean) {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
         const keyboardOpen = window.innerHeight - viewport.height > 60
-        setOffsetTop(keyboardOpen ? Math.max(0, Math.ceil(viewport.offsetTop)) : 0)
+        setOffsetTop(
+          keyboardOpen
+            ? Math.max(0, Math.ceil(viewport.offsetTop + getBraveBottomToolbarOffset()))
+            : 0
+        )
       })
     }
 
@@ -92,6 +96,22 @@ function useKeyboardViewportOffsetTop(open: boolean) {
   }, [open])
 
   return open ? offsetTop : 0
+}
+
+function getBraveBottomToolbarOffset() {
+  const browserNavigator = navigator as Navigator & {
+    brave?: unknown
+    userAgentData?: { brands?: { brand: string }[] }
+  }
+  const isAndroid = /Android/i.test(browserNavigator.userAgent)
+  const isBrave =
+    Boolean(browserNavigator.brave) ||
+    browserNavigator.userAgentData?.brands?.some(({ brand }) => brand === 'Brave')
+
+  // Brave on Android hides its 48px bottom toolbar for the keyboard but, on some
+  // devices, leaves that toolbar subtracted from visualViewport.height. Compensate
+  // for the stale geometry so the drawer footer meets the real keyboard edge.
+  return isAndroid && isBrave ? 48 : 0
 }
 
 export function ConfirmDialog({
