@@ -648,14 +648,17 @@ body::before {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
   background: rgb(23 31 25/0.34);
   backdrop-filter: blur(3px);
   opacity: 1;
   transition: opacity 180ms ease-out;
 }
 .drawer-backdrop {
+  z-index: 50;
   opacity: calc(1 - var(--drawer-swipe-progress, 0));
+}
+.dialog-backdrop {
+  z-index: 60;
 }
 .drawer-backdrop[data-starting-style],
 .drawer-backdrop[data-ending-style],
@@ -671,6 +674,7 @@ body::before {
   align-items: flex-end;
   justify-content: center;
   padding-top: 24px;
+  padding-bottom: var(--drawer-keyboard-inset, 0px);
   touch-action: none;
 }
 .drawer-popup {
@@ -680,7 +684,7 @@ body::before {
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(620px, 100%);
   height: var(--drawer-height);
-  max-height: calc(100svh - 24px);
+  max-height: calc(100svh - 24px - var(--drawer-keyboard-inset, 0px));
   overflow: hidden;
   border-radius: 24px 24px 0 0;
   outline: 0;
@@ -748,14 +752,9 @@ body::before {
   touch-action: pan-y;
 }
 .drawer-footer {
-  padding: 12px 20px calc(12px + env(safe-area-inset-bottom) + var(--drawer-keyboard-inset, 0px));
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border);
   background: var(--card);
-  transition-property: padding-bottom;
-  transition-duration: 220ms;
-}
-.history-drawer {
-  --drawer-height: min(620px, calc(100svh - 24px));
 }
 .history-summary {
   display: flex;
@@ -863,7 +862,7 @@ body::before {
 .confirm-viewport {
   position: fixed;
   inset: 0;
-  z-index: 52;
+  z-index: 61;
   display: grid;
   place-items: center;
   padding: 20px;
