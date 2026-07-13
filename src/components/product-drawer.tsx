@@ -1,4 +1,4 @@
-import { ClockCounterClockwise, Trash } from '@phosphor-icons/react'
+import { ListBullets, Trash } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useMemo, useState, type FormEvent } from 'react'
@@ -124,7 +124,7 @@ export function ProductDrawer({
             }}
             aria-label={t('history')}
           >
-            <ClockCounterClockwise />
+            <ListBullets weight="bold" />
           </button>
         </div>
         <form className="drawer-form" onSubmit={submit}>
