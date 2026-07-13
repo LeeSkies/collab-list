@@ -107,20 +107,15 @@ export function ProductDrawer({
           </button>
         }
         footer={
-          <div className="drawer-footer-actions">
-            <Button type="button" variant="secondary" size="lg" onClick={() => onToggle(product)}>
-              {product.is_picked ? t('restore') : t('pick')}
-            </Button>
-            <Button
-              className="drawer-save"
-              type="submit"
-              form={formId}
-              size="lg"
-              disabled={!dirty || Boolean(validation) || pending}
-            >
-              {pending ? t('saving') : t('save')}
-            </Button>
-          </div>
+          <Button
+            className="drawer-save"
+            type="submit"
+            form={formId}
+            size="lg"
+            disabled={!dirty || Boolean(validation) || pending}
+          >
+            {pending ? t('saving') : t('save')}
+          </Button>
         }
         nested={
           <HistoryDrawer
@@ -193,6 +188,9 @@ export function ProductDrawer({
               {error || validation}
             </p>
           )}
+          <Button type="button" variant="secondary" size="lg" onClick={() => onToggle(product)}>
+            {product.is_picked ? t('restore') : t('pick')}
+          </Button>
         </form>
       </AppDrawer>
       <ConfirmDialog
