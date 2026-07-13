@@ -87,7 +87,7 @@ const resources = {
       deleteUserBody: 'This permanently removes the user’s account.',
       currentUser: 'You',
       updateReady: 'A new version is ready.',
-      update: 'Update now',
+      update: 'Update',
       productCreated: '{{name}} added.',
       productDeleted: '{{name}} deleted.'
     }
@@ -166,7 +166,7 @@ const resources = {
       deleteUserBody: 'חשבון המשתמש יימחק לצמיתות.',
       currentUser: 'אתם',
       updateReady: 'גרסה חדשה מוכנה.',
-      update: 'עדכון עכשיו',
+      update: 'עדכון',
       productCreated: '{{name}} נוסף.',
       productDeleted: '{{name}} נמחק.'
     }
