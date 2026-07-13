@@ -62,19 +62,20 @@ export function GroceryApp() {
   }, [toast])
 
   useEffect(() => {
-    const channel = api.realtime.subscribe(
-      () => void client.invalidateQueries({ queryKey: ['products'] }),
-      (status) => {
-        setRealtime(
-          status === 'SUBSCRIBED'
-            ? 'connected'
-            : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'
-              ? 'disconnected'
-              : 'connecting'
-        )
-        if (status === 'SUBSCRIBED') void client.invalidateQueries({ queryKey: ['products'] })
-      }
-    )
+    const refreshRealtimeData = () => {
+      void client.invalidateQueries({ queryKey: ['products'] })
+      void client.invalidateQueries({ queryKey: ['history'] })
+    }
+    const channel = api.realtime.subscribe(refreshRealtimeData, (status) => {
+      setRealtime(
+        status === 'SUBSCRIBED'
+          ? 'connected'
+          : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'
+            ? 'disconnected'
+            : 'connecting'
+      )
+      if (status === 'SUBSCRIBED') refreshRealtimeData()
+    })
     return () => {
       void channel.unsubscribe()
     }

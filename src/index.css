@@ -695,19 +695,35 @@ body::before {
 }
 .drawer-tools {
   display: flex;
-  justify-content: space-between;
-  margin: -10px 0 16px;
+  justify-content: flex-end;
+  margin: -10px 0 8px;
 }
 .drawer-tools button {
   background: var(--muted);
 }
-.last-picked {
-  margin: -10px 0 18px;
-  padding: 10px 12px;
+.history-summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding-block: 3px;
+  padding-inline-start: 12px;
+  padding-inline-end: 4px;
   border-radius: 10px;
   background: var(--secondary);
   font-size: 12px;
   color: var(--secondary-foreground);
+}
+.history-summary > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-summary .icon-button {
+  flex: 0 0 42px;
 }
 .drawer-form label > span,
 .admin-create label > span {

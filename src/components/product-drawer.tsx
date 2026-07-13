@@ -11,7 +11,7 @@ import {
   PRODUCT_NOTES_MAX,
   validateQuantity
 } from '../lib/product'
-import type { Product } from '../lib/types'
+import type { PickHistory, Product } from '../lib/types'
 import { Button } from './ui/button'
 import { ConfirmDialog, Sheet } from './sheet'
 
@@ -49,6 +49,12 @@ export function ProductDrawer({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
+  const history = useQuery({
+    queryKey: ['history', product.id],
+    queryFn: () => api.history.list(product.id),
+    enabled: open
+  })
+  const latestPick = history.data?.[0]
 
   const dirty = JSON.stringify(values) !== JSON.stringify(initial)
   const validation = useMemo(() => {
@@ -93,13 +99,6 @@ export function ProductDrawer({
       >
         <div className="drawer-tools">
           <button
-            className="icon-button"
-            onClick={() => setHistoryOpen(true)}
-            aria-label={t('history')}
-          >
-            <ClockCounterClockwise />
-          </button>
-          <button
             className="icon-button danger-quiet"
             onClick={() => setDeleteOpen(true)}
             aria-label={t('delete')}
@@ -107,11 +106,27 @@ export function ProductDrawer({
             <Trash />
           </button>
         </div>
-        {product.is_picked && product.picked_at && (
-          <p className="last-picked">
-            {t('lastPicked', { date: relativeDate(product.picked_at, t) })}
-          </p>
-        )}
+        <div className="history-summary">
+          <span>
+            {history.isLoading
+              ? t('historyLoading')
+              : history.isError
+                ? t('requestFailed')
+                : latestPick
+                  ? t('lastPicked', { date: relativeDate(latestPick.picked_at, t) })
+                  : t('noHistory')}
+          </span>
+          <button
+            className="icon-button"
+            onClick={() => {
+              setHistoryOpen(true)
+              void history.refetch()
+            }}
+            aria-label={t('history')}
+          >
+            <ClockCounterClockwise />
+          </button>
+        </div>
         <form className="drawer-form" onSubmit={submit}>
           <label>
             <span>{t('appName').includes('ה') ? 'שם המוצר' : 'Product name'}</span>
@@ -164,7 +179,14 @@ export function ProductDrawer({
           </Button>
         </form>
       </Sheet>
-      <HistoryDrawer product={product} open={historyOpen} onOpenChange={setHistoryOpen} />
+      <HistoryDrawer
+        product={product}
+        entries={history.data}
+        isLoading={history.isLoading}
+        isError={history.isError}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+      />
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -194,19 +216,20 @@ export function ProductDrawer({
 
 function HistoryDrawer({
   product,
+  entries,
+  isLoading,
+  isError,
   open,
   onOpenChange
 }: {
   product: Product
+  entries?: PickHistory[]
+  isLoading: boolean
+  isError: boolean
   open: boolean
   onOpenChange(open: boolean): void
 }) {
   const { t } = useTranslation()
-  const query = useQuery({
-    queryKey: ['history', product.id],
-    queryFn: () => api.history.list(product.id),
-    enabled: open
-  })
   return (
     <Sheet
       open={open}
@@ -216,10 +239,12 @@ function HistoryDrawer({
       className="history-sheet"
     >
       <div className="history-list">
-        {query.isLoading ? (
-          <p>{t('loading')}</p>
-        ) : query.data?.length ? (
-          query.data.map((entry) => (
+        {isLoading ? (
+          <p>{t('historyLoading')}</p>
+        ) : isError ? (
+          <p className="empty-note">{t('requestFailed')}</p>
+        ) : entries?.length ? (
+          entries.map((entry) => (
             <article key={entry.id}>
               <span className="history-avatar" aria-hidden="true">
                 {emailInitial(entry.picked_by_email)}
