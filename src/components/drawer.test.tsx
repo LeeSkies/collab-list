@@ -27,6 +27,25 @@ describe('ConfirmDialog', () => {
 
     expect(screen.getByRole('button', { name: 'ביטול' })).toBeVisible()
   })
+
+  it('uses the shared high-contrast primary button', () => {
+    render(
+      <I18nextProvider i18n={i18n}>
+        <ConfirmDialog
+          open
+          onOpenChange={() => undefined}
+          title="Discard changes?"
+          body="Unsaved changes"
+          confirmLabel="Discard"
+          onConfirm={() => undefined}
+        />
+      </I18nextProvider>
+    )
+
+    const confirm = screen.getByRole('button', { name: 'Discard' })
+    expect(confirm).toHaveAttribute('data-slot', 'button')
+    expect(confirm).toHaveClass('text-primary-foreground')
+  })
 })
 
 describe('AppDrawer', () => {

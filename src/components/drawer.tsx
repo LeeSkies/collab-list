@@ -157,9 +157,13 @@ export function ConfirmDialog({
             <Dialog.Description>{body}</Dialog.Description>
             <div className="confirm-actions">
               <Dialog.Close className="button secondary">{t('cancel')}</Dialog.Close>
-              <button className={destructive ? 'button danger' : 'button'} onClick={onConfirm}>
-                {confirmLabel}
-              </button>
+              {destructive ? (
+                <button className="button danger" onClick={onConfirm}>
+                  {confirmLabel}
+                </button>
+              ) : (
+                <Button onClick={onConfirm}>{confirmLabel}</Button>
+              )}
             </div>
           </Dialog.Popup>
         </Dialog.Viewport>
