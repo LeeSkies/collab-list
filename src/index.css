@@ -519,10 +519,6 @@ body::before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.is-picked .product-main strong {
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-}
 .quantity-controls {
   display: flex;
   align-items: center;
@@ -566,11 +562,11 @@ body::before {
   width: 64px;
   height: 42px;
   padding: 0 8px;
-  border: 1px solid color-mix(in oklab, var(--input), transparent 25%);
+  border: 1px solid oklch(0.84 0.015 255);
   border-radius: 13px;
   outline: 0;
-  background: var(--secondary);
-  color: var(--secondary-foreground);
+  background: oklch(0.92 0.012 255);
+  color: oklch(0.38 0.025 255);
   text-align: center;
   font-size: 13px;
   font-weight: 850;
