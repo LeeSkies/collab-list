@@ -1,6 +1,6 @@
 import { ArrowCounterClockwise, Check, Minus, Plus } from '@phosphor-icons/react'
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
-import { forwardRef, useState } from 'react'
+import { forwardRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { quantityCanAdjust } from '../lib/product'
 import type { Product } from '../lib/types'
@@ -25,11 +25,17 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
   const progress = useTransform(x, [0, direction * 92], [0, 1])
   const backgroundOpacity = useTransform(progress, [0, 1], [0, 1])
   const [crossed, setCrossed] = useState(false)
+  const [canReflow, setCanReflow] = useState(false)
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setCanReflow(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   return (
     <motion.li
       ref={ref}
-      layout
+      layout={!reduced && canReflow ? 'position' : false}
       data-product-id={product.id}
       className={`product-wrap ${duplicatePulse ? 'duplicate-pulse' : ''}`}
       initial={{ opacity: 0, scale: 0.9 }}
