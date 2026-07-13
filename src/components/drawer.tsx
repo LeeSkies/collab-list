@@ -3,7 +3,6 @@ import { Drawer } from '@base-ui/react/drawer'
 import { X } from '@phosphor-icons/react'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button } from './ui/button'
 
 export function AppDrawer({
   open,
@@ -162,7 +161,9 @@ export function ConfirmDialog({
                   {confirmLabel}
                 </button>
               ) : (
-                <Button onClick={onConfirm}>{confirmLabel}</Button>
+                <button className="button" onClick={onConfirm}>
+                  {confirmLabel}
+                </button>
               )}
             </div>
           </Dialog.Popup>
@@ -203,9 +204,9 @@ export function ChoiceDialog({
             <div className="choice-dialog-options">{children}</div>
             <div className="confirm-actions">
               <Dialog.Close className="button secondary">{t('cancel')}</Dialog.Close>
-              <Button disabled={pending} onClick={onConfirm}>
+              <button className="button" disabled={pending} onClick={onConfirm}>
                 {confirmLabel}
-              </Button>
+              </button>
             </div>
           </Dialog.Popup>
         </Dialog.Viewport>

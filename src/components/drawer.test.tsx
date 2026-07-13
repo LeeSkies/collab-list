@@ -28,7 +28,7 @@ describe('ConfirmDialog', () => {
     expect(screen.getByRole('button', { name: 'ביטול' })).toBeVisible()
   })
 
-  it('uses the shared high-contrast primary button', () => {
+  it('uses the full-height dialog button for the primary action', () => {
     render(
       <I18nextProvider i18n={i18n}>
         <ConfirmDialog
@@ -43,8 +43,8 @@ describe('ConfirmDialog', () => {
     )
 
     const confirm = screen.getByRole('button', { name: 'Discard' })
-    expect(confirm).toHaveAttribute('data-slot', 'button')
-    expect(confirm).toHaveClass('text-primary-foreground')
+    expect(confirm).toHaveClass('button')
+    expect(confirm).not.toHaveAttribute('data-slot')
   })
 })
 

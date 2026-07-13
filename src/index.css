@@ -467,7 +467,7 @@ body::before {
   height: 20px;
   margin-inline-start: auto;
   border-radius: 10px;
-  background: var(--secondary);
+  background: transparent;
   color: var(--primary);
 }
 .product-section h2 .restore-all-button::before {
@@ -1032,11 +1032,6 @@ body::before {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 24px;
-}
-.confirm-actions [data-slot='button'] {
-  min-height: 40px;
-  padding: 0.7rem 1rem;
-  font-weight: 700;
 }
 .choice-dialog-options {
   display: grid;
