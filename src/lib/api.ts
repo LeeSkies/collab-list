@@ -15,25 +15,47 @@ export function isProductConflict(reason: unknown): reason is ApiError {
   return reason instanceof ApiError && (reason.code === 'PT409' || reason.code === '40001')
 }
 
-async function unwrap<T>(
-  promise: PromiseLike<{ data: T | null; error: { code?: string; message: string } | null }>
-): Promise<T> {
-  const { data, error } = await Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new ApiError('timeout', 'The request timed out')), 12_000)
-    )
-  ])
-  if (error) throw new ApiError(error.code ?? 'unknown', error.message)
-  if (data == null) throw new ApiError('empty', 'The server returned no data')
-  return data
+type SupabaseResult<T> = {
+  data: T | null
+  error: { code?: string; message: string } | null
+}
+
+type AbortableRequest<T> = PromiseLike<SupabaseResult<T>> & {
+  abortSignal?(signal: AbortSignal): PromiseLike<SupabaseResult<T>>
+}
+
+async function unwrap<T>(request: AbortableRequest<T>, externalSignal?: AbortSignal): Promise<T> {
+  const controller = new AbortController()
+  let timedOut = false
+  const abortFromExternal = () => controller.abort(externalSignal?.reason)
+  if (externalSignal?.aborted) abortFromExternal()
+  else externalSignal?.addEventListener('abort', abortFromExternal, { once: true })
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, 12_000)
+
+  try {
+    const operation = request.abortSignal?.(controller.signal) ?? request
+    const { data, error } = await operation
+    if (error) throw new ApiError(error.code ?? 'unknown', error.message)
+    if (data == null) throw new ApiError('empty', 'The server returned no data')
+    return data
+  } catch (reason) {
+    if (timedOut) throw new ApiError('timeout', 'The request timed out')
+    throw reason
+  } finally {
+    clearTimeout(timeout)
+    externalSignal?.removeEventListener('abort', abortFromExternal)
+  }
 }
 
 export const api = {
   products: {
-    list: () =>
+    list: (signal?: AbortSignal) =>
       unwrap<Product[]>(
-        supabase.from('products').select('*').order('ordering_at', { ascending: false })
+        supabase.from('products').select('*').order('ordering_at', { ascending: false }),
+        signal
       ),
     create: async (name: string) => {
       const rows = await unwrap<Product[]>(supabase.rpc('create_product', { p_name: name }))

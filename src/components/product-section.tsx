@@ -8,6 +8,7 @@ export function ProductSection({
   products,
   duplicatePulse,
   busyProductIds,
+  bulkBusy = false,
   onEdit,
   onAdjust,
   onToggle,
@@ -18,6 +19,7 @@ export function ProductSection({
   products: Product[]
   duplicatePulse: string
   busyProductIds?: ReadonlySet<string>
+  bulkBusy?: boolean
   onEdit(product: Product): void
   onAdjust(product: Product, delta: 1 | -1): void
   onToggle(product: Product): void
@@ -40,7 +42,7 @@ export function ProductSection({
               key={product.id}
               product={product}
               duplicatePulse={duplicatePulse === product.id}
-              busy={busyProductIds?.has(product.id)}
+              busy={bulkBusy || busyProductIds?.has(product.id)}
               onEdit={() => onEdit(product)}
               onAdjust={(delta) => onAdjust(product, delta)}
               onToggle={() => onToggle(product)}
