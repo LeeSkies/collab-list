@@ -22,8 +22,8 @@ export function AdminDrawer({
   const [error, setError] = useState('')
   const users = useQuery({ queryKey: ['admin-users'], queryFn: api.admin.list, enabled: open })
   const create = useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      api.admin.create(email, password),
+    mutationFn: ({ name, email, password }: { name: string; email: string; password: string }) =>
+      api.admin.create(name, email, password),
     onSuccess: () => client.invalidateQueries({ queryKey: ['admin-users'] }),
     onError: () => setError(t('requestFailed'))
   })
@@ -37,7 +37,11 @@ export function AdminDrawer({
     event.preventDefault()
     setError('')
     const form = new FormData(event.currentTarget)
-    create.mutate({ email: String(form.get('email')), password: String(form.get('password')) })
+    create.mutate({
+      name: String(form.get('name')).trim(),
+      email: String(form.get('email')),
+      password: String(form.get('password'))
+    })
     event.currentTarget.reset()
   }
 
@@ -55,6 +59,10 @@ export function AdminDrawer({
             <strong>{t('addUser')}</strong>
           </div>
           <label>
+            <span>{t('userName')}</span>
+            <input name="name" type="text" maxLength={80} required />
+          </label>
+          <label>
             <span>{t('email')}</span>
             <input name="email" type="email" required />
           </label>
@@ -67,16 +75,17 @@ export function AdminDrawer({
               {error}
             </p>
           )}
-          <Button type="submit" disabled={create.isPending}>
+          <Button className="button" size="lg" type="submit" disabled={create.isPending}>
             {create.isPending ? t('creatingUser') : t('createUser')}
           </Button>
         </form>
         <div className="user-list">
           {users.data?.map((user) => (
             <article key={user.id}>
-              <div className="avatar">{user.email.slice(0, 1).toUpperCase()}</div>
+              <div className="avatar">{user.name.slice(0, 1).toLocaleUpperCase()}</div>
               <div>
-                <strong>{user.email}</strong>
+                <strong>{user.name}</strong>
+                <small>{user.email}</small>
                 <span>
                   {user.role === 'admin' ? 'Admin' : t('member')}
                   {user.id === auth.user?.id ? ` · ${t('currentUser')}` : ''}
@@ -85,7 +94,7 @@ export function AdminDrawer({
               {user.id !== auth.user?.id && (
                 <button
                   className="icon-button danger-quiet"
-                  aria-label={`${t('delete')} ${user.email}`}
+                  aria-label={`${t('delete')} ${user.name}`}
                   onClick={() => setRemoveUser(user)}
                 >
                   <Trash />
@@ -99,7 +108,7 @@ export function AdminDrawer({
         <ConfirmDialog
           open
           onOpenChange={(next) => !next && setRemoveUser(null)}
-          title={t('deleteUserTitle', { email: removeUser.email })}
+          title={t('deleteUserTitle', { name: removeUser.name })}
           body={t('deleteUserBody')}
           confirmLabel={t('delete')}
           destructive

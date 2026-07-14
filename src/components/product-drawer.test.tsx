@@ -27,6 +27,7 @@ const product: Product = {
 function renderDrawer(onSave = vi.fn().mockResolvedValue(undefined)) {
   vi.spyOn(api.profile, 'current').mockResolvedValue({
     id: '10000000-0000-0000-0000-000000000001',
+    name: 'Lee',
     email: 'admin@example.com',
     role: 'admin',
     created_at: '2026-07-13T11:00:00.000Z',
@@ -60,7 +61,7 @@ describe('ProductDrawer notes', () => {
     expect(screen.getByRole('heading', { name: 'Milk' })).toBeVisible()
     expect(screen.getByText('Created')).toBeVisible()
     expect(screen.getByText('Updated')).toBeVisible()
-    expect(await screen.findByText('admin@example.com')).toBeVisible()
+    expect(await screen.findByText('Lee')).toBeVisible()
     expect(screen.queryByRole('button', { name: /history/i })).not.toBeInTheDocument()
     const notes = screen.getByRole('textbox', { name: /Notes/ })
     expect(notes).toHaveValue('Buy the blue carton')

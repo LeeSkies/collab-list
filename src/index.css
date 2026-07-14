@@ -1103,6 +1103,13 @@ body::before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.user-list small {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .user-list span {
   color: var(--muted-foreground);
   font-size: 11px;

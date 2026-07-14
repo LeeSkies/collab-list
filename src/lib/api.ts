@@ -100,8 +100,8 @@ export const api = {
       return data as T
     },
     list: () => api.admin.invoke<{ users: AdminUser[] }>('list').then((value) => value.users),
-    create: (email: string, password: string) =>
-      api.admin.invoke<{ user: AdminUser }>('create', { email, password }),
+    create: (name: string, email: string, password: string) =>
+      api.admin.invoke<{ user: AdminUser }>('create', { name, email, password }),
     remove: (userId: string) => api.admin.invoke<{ ok: true }>('delete', { userId })
   },
   realtime: {

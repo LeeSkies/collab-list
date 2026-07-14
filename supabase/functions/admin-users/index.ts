@@ -38,12 +38,13 @@ Deno.serve(async (request) => {
     if (body.action === 'list') {
       const { data, error } = await admin
         .from('profiles')
-        .select('id,email,role,created_at')
+        .select('id,name,email,role,created_at')
         .order('created_at')
       if (error) throw error
       return json({
         users: data.map((item) => ({
           id: item.id,
+          name: item.name,
           email: item.email,
           role: item.role,
           createdAt: item.created_at
@@ -52,21 +53,26 @@ Deno.serve(async (request) => {
     }
     if (body.action === 'create') {
       if (
+        typeof body.name !== 'string' ||
+        body.name.trim().length < 1 ||
+        body.name.trim().length > 80 ||
         typeof body.email !== 'string' ||
         typeof body.password !== 'string' ||
         body.password.length < 8
       )
-        return json({ error: 'Valid email and password are required' }, 400)
+        return json({ error: 'Valid name, email, and password are required' }, 400)
       const { data, error } = await admin.auth.admin.createUser({
         email: body.email.trim().toLowerCase(),
         password: body.password,
-        email_confirm: true
+        email_confirm: true,
+        user_metadata: { name: body.name.trim() }
       })
       if (error) return json({ error: 'Could not create user', code: error.code }, 400)
       return json(
         {
           user: {
             id: data.user.id,
+            name: body.name.trim(),
             email: data.user.email,
             role: 'member',
             createdAt: data.user.created_at

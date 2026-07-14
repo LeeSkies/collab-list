@@ -2,6 +2,7 @@ export type Role = 'admin' | 'member'
 
 export interface Profile {
   id: string
+  name: string
   email: string
   role: Role
   created_at: string
@@ -26,6 +27,7 @@ export interface Product {
 
 export interface AdminUser {
   id: string
+  name: string
   email: string
   role: Role
   createdAt: string

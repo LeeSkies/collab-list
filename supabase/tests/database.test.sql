@@ -1,10 +1,14 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(36);
 
 select has_table('public', 'products', 'products exists');
 select hasnt_table('public', 'product_pick_history', 'history table was removed');
 select has_table('public', 'profiles', 'profiles exists');
+select has_column('public', 'profiles', 'name', 'profiles have display names');
+select col_not_null('public', 'profiles', 'name', 'profile names are required');
+select is((select name from public.profiles where email = 'admin@example.com'), 'Local Admin', 'new-user trigger stores the supplied display name');
+select throws_ok($$ update public.profiles set name = '' where email = 'admin@example.com' $$, '23514', null, 'blank profile names are rejected');
 select col_type_is('public', 'products', 'quantity', 'numeric(5,2)', 'quantity is exact numeric');
 select col_is_pk('public', 'products', 'id', 'product id is primary key');
 select fk_ok('public', 'products', 'updated_by', 'public', 'profiles', 'id', 'product updater references profiles');

@@ -131,15 +131,15 @@ export function ProductDrawer({
               {product.updated_by && (
                 <span
                   className="audit-user"
-                  title={updatedBy.data?.email}
+                  title={updatedBy.data?.name}
                   aria-label={
-                    updatedBy.data ? t('updatedBy', { email: updatedBy.data.email }) : undefined
+                    updatedBy.data ? t('updatedBy', { name: updatedBy.data.name }) : undefined
                   }
                 >
                   <span className="audit-avatar" aria-hidden="true">
-                    {updatedBy.data ? emailInitial(updatedBy.data.email) : '…'}
+                    {updatedBy.data ? nameInitial(updatedBy.data.name) : '…'}
                   </span>
-                  <span>{updatedBy.data?.email ?? (updatedBy.isLoading ? '…' : '—')}</span>
+                  <span>{updatedBy.data?.name ?? (updatedBy.isLoading ? '…' : '—')}</span>
                 </span>
               )}
             </dd>
@@ -227,8 +227,8 @@ export function ProductDrawer({
   )
 }
 
-function emailInitial(email: string) {
-  return Array.from(email.trim())[0]?.toLocaleUpperCase() ?? '?'
+function nameInitial(name: string) {
+  return Array.from(name.trim())[0]?.toLocaleUpperCase() ?? '?'
 }
 
 function formatAuditDate(value: string) {
