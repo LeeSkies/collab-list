@@ -9,13 +9,14 @@ import { HoldToRevealName } from './hold-to-reveal-name'
 interface ProductRowProps {
   product: Product
   duplicatePulse: boolean
+  busy?: boolean
   onEdit(): void
   onAdjust(delta: 1 | -1): void
   onToggle(): void
 }
 
 export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function ProductRow(
-  { product, duplicatePulse, onEdit, onAdjust, onToggle },
+  { product, duplicatePulse, busy = false, onEdit, onAdjust, onToggle },
   ref
 ) {
   const { t, i18n } = useTranslation()
@@ -50,7 +51,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
       <motion.article
         className={`product-row ${product.is_picked ? 'is-picked' : ''}`}
         style={{ x, opacity }}
-        drag={reduced ? false : 'x'}
+        drag={reduced || busy ? false : 'x'}
         dragConstraints={{ left: direction < 0 ? -104 : 0, right: direction > 0 ? 104 : 0 }}
         dragElastic={0.08}
         dragMomentum={false}
@@ -83,6 +84,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
         <button
           className="product-main"
           onClick={onEdit}
+          disabled={busy}
           aria-label={t('edit', { name: product.name })}
         >
           <strong>
@@ -103,7 +105,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
           <div className="quantity-controls" onPointerDown={(event) => event.stopPropagation()}>
             <button
               aria-label={t('minus')}
-              disabled={!quantityCanAdjust(product.quantity, -1)}
+              disabled={busy || !quantityCanAdjust(product.quantity, -1)}
               onClick={() => onAdjust(-1)}
             >
               <Minus weight="bold" />
@@ -112,19 +114,20 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
               className="quantity-value"
               aria-label={`${t('quantity')}: ${product.quantity}`}
               onClick={onEdit}
+              disabled={busy}
             >
               {product.quantity}
             </button>
             <button
               aria-label={t('plus')}
-              disabled={!quantityCanAdjust(product.quantity, 1)}
+              disabled={busy || !quantityCanAdjust(product.quantity, 1)}
               onClick={() => onAdjust(1)}
             >
               <Plus weight="bold" />
             </button>
           </div>
         )}
-        <button className="sr-only" onClick={onToggle}>
+        <button className="sr-only" onClick={onToggle} disabled={busy}>
           {product.is_picked ? t('restore') : t('pick')}
         </button>
       </motion.article>

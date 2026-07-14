@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from '../auth'
-import { api, ApiError } from '../lib/api'
+import { api, ApiError, isProductConflict } from '../lib/api'
 import {
   duplicateSignature,
   normalizeNameForStorage,
@@ -40,6 +40,8 @@ export function GroceryApp() {
   const [online, setOnline] = useState(navigator.onLine)
   const [realtime, setRealtime] = useState('connecting')
   const [showConnectionWarning, setShowConnectionWarning] = useState(false)
+  const busyProductsRef = useRef(new Set<string>())
+  const [busyProductIds, setBusyProductIds] = useState<ReadonlySet<string>>(new Set())
   const searchRef = useRef<HTMLInputElement>(null)
   const products = useQuery({
     queryKey: ['products'],
@@ -116,18 +118,39 @@ export function GroceryApp() {
     : undefined
   const canCreate = Boolean(normalizeText(search)) && !duplicate
 
-  function mutationError(reason: unknown) {
+  async function refreshProducts(productId?: string) {
+    await client.invalidateQueries({ queryKey: ['products'] })
+    if (!productId) return
+    const latest = client
+      .getQueryData<Product[]>(['products'])
+      ?.find((product) => product.id === productId)
+    if (latest) setSelected((current) => (current?.id === productId ? latest : current))
+  }
+  function mutationError(reason: unknown, productId?: string) {
+    if (isProductConflict(reason)) void refreshProducts(productId)
     setToast(
-      reason instanceof ApiError
-        ? reason.code === '23505'
-          ? t('duplicate')
-          : reason.code === 'timeout'
-            ? t('timeout')
-            : t('requestFailed')
-        : navigator.onLine
-          ? t('requestFailed')
-          : t('offline')
+      isProductConflict(reason)
+        ? t('conflict')
+        : reason instanceof ApiError
+          ? reason.code === '23505'
+            ? t('duplicate')
+            : reason.code === 'timeout'
+              ? t('timeout')
+              : t('requestFailed')
+          : navigator.onLine
+            ? t('requestFailed')
+            : t('offline')
     )
+  }
+  function lockProduct(productId: string) {
+    if (busyProductsRef.current.has(productId)) return false
+    busyProductsRef.current.add(productId)
+    setBusyProductIds(new Set(busyProductsRef.current))
+    return true
+  }
+  function unlockProduct(productId: string) {
+    busyProductsRef.current.delete(productId)
+    setBusyProductIds(new Set(busyProductsRef.current))
   }
   function replaceProduct(next: Product) {
     client.setQueryData<Product[]>(['products'], (current = []) =>
@@ -144,7 +167,7 @@ export function GroceryApp() {
       setSearch('')
       searchRef.current?.focus()
     },
-    onError: mutationError
+    onError: (reason) => mutationError(reason)
   })
   const adjust = useMutation({
     mutationFn: ({ product, delta }: { product: Product; delta: 1 | -1 }) =>
@@ -162,7 +185,7 @@ export function GroceryApp() {
     onSuccess: replaceProduct,
     onError: (reason, _variables, context) => {
       if (context?.previous) client.setQueryData(['products'], context.previous)
-      mutationError(reason)
+      mutationError(reason, _variables.product.id)
     }
   })
   const toggle = useMutation({
@@ -186,7 +209,7 @@ export function GroceryApp() {
     },
     onError: (reason, _variables, context) => {
       if (context?.previous) client.setQueryData(['products'], context.previous)
-      mutationError(reason)
+      mutationError(reason, _variables.id)
     }
   })
   const update = useMutation({
@@ -200,6 +223,9 @@ export function GroceryApp() {
     onSuccess: (next) => {
       replaceProduct(next)
       setSelected(next)
+    },
+    onError: (reason, variables) => {
+      if (isProductConflict(reason)) void refreshProducts(variables.product.id)
     }
   })
   const remove = useMutation({
@@ -208,7 +234,7 @@ export function GroceryApp() {
       client.setQueryData<Product[]>(['products'], (current = []) =>
         current.filter((item) => item.id !== product.id)
       ),
-    onError: mutationError
+    onError: (reason, product) => mutationError(reason, product.id)
   })
   const restoreAll = useMutation({
     mutationFn: ({
@@ -225,7 +251,7 @@ export function GroceryApp() {
       )
       setRestoreAllOpen(false)
     },
-    onError: mutationError
+    onError: (reason) => mutationError(reason)
   })
 
   function activateCreate() {
@@ -239,6 +265,37 @@ export function GroceryApp() {
       return
     }
     if (canCreate && !create.isPending) create.mutate(normalizeNameForStorage(search))
+  }
+
+  function adjustProduct(product: Product, delta: 1 | -1) {
+    if (!lockProduct(product.id)) return
+    adjust.mutate({ product, delta }, { onSettled: () => unlockProduct(product.id) })
+  }
+
+  function toggleProduct(product: Product) {
+    if (!lockProduct(product.id)) return
+    toggle.mutate(product, { onSettled: () => unlockProduct(product.id) })
+  }
+
+  async function saveProduct(
+    product: Product,
+    changes: { name: string; quantity: string; notes: string }
+  ) {
+    if (!lockProduct(product.id)) throw new ApiError('busy', 'Product update already in progress')
+    try {
+      await update.mutateAsync({ product, changes })
+    } finally {
+      unlockProduct(product.id)
+    }
+  }
+
+  async function deleteProduct(product: Product) {
+    if (!lockProduct(product.id)) throw new ApiError('busy', 'Product update already in progress')
+    try {
+      await remove.mutateAsync(product)
+    } finally {
+      unlockProduct(product.id)
+    }
   }
 
   return (
@@ -318,9 +375,10 @@ export function GroceryApp() {
                 title={t('unpicked')}
                 products={unpicked}
                 duplicatePulse={duplicatePulse}
+                busyProductIds={busyProductIds}
                 onEdit={setSelected}
-                onAdjust={(product, delta) => adjust.mutate({ product, delta })}
-                onToggle={(product) => toggle.mutate(product)}
+                onAdjust={adjustProduct}
+                onToggle={toggleProduct}
               />
               <ProductSection
                 title={t('picked')}
@@ -337,9 +395,10 @@ export function GroceryApp() {
                   </button>
                 }
                 duplicatePulse={duplicatePulse}
+                busyProductIds={busyProductIds}
                 onEdit={setSelected}
-                onAdjust={(product, delta) => adjust.mutate({ product, delta })}
-                onToggle={(product) => toggle.mutate(product)}
+                onAdjust={adjustProduct}
+                onToggle={toggleProduct}
               />
               {list.length === 0 && <p className="empty-state">{t('empty')}</p>}
               {search && filtered.length === 0 && <p className="empty-state">{t('noMatches')}</p>}
@@ -354,14 +413,10 @@ export function GroceryApp() {
           products={list}
           open={Boolean(selected)}
           onOpenChange={(open) => !open && setSelected(null)}
-          pending={update.isPending}
-          onSave={async (product, changes) => {
-            await update.mutateAsync({ product, changes })
-          }}
-          onDelete={async (product) => {
-            await remove.mutateAsync(product)
-          }}
-          onToggle={(product) => toggle.mutate(product)}
+          pending={busyProductIds.has(selected.id)}
+          onSave={saveProduct}
+          onDelete={deleteProduct}
+          onToggle={toggleProduct}
         />
       )}
       {auth.profile?.role === 'admin' && (

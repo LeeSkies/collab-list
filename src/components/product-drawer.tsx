@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api, ApiError } from '../lib/api'
+import { api, isProductConflict } from '../lib/api'
 import {
   duplicateSignature,
   normalizeNameForStorage,
@@ -83,9 +83,7 @@ export function ProductDrawer({
       setInitial(values)
       onOpenChange(false)
     } catch (reason) {
-      setError(
-        reason instanceof ApiError && reason.code === '40001' ? t('conflict') : t('requestFailed')
-      )
+      setError(isProductConflict(reason) ? t('conflict') : t('requestFailed'))
     }
   }
 
@@ -100,6 +98,7 @@ export function ProductDrawer({
           <button
             className="icon-button danger-quiet"
             onClick={() => setDeleteOpen(true)}
+            disabled={pending}
             aria-label={t('delete')}
           >
             <Trash />
@@ -184,7 +183,13 @@ export function ProductDrawer({
               {error || validation}
             </p>
           )}
-          <Button type="button" variant="secondary" size="lg" onClick={() => onToggle(product)}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            disabled={pending}
+            onClick={() => onToggle(product)}
+          >
             {product.is_picked ? t('restore') : t('pick')}
           </Button>
         </form>
@@ -196,9 +201,14 @@ export function ProductDrawer({
         body={t('deleteBody')}
         confirmLabel={t('delete')}
         destructive
+        pending={pending}
         onConfirm={() => {
-          setDeleteOpen(false)
-          void onDelete(product).then(() => onOpenChange(false))
+          void onDelete(product)
+            .then(() => {
+              setDeleteOpen(false)
+              onOpenChange(false)
+            })
+            .catch(() => undefined)
         }}
       />
       <ConfirmDialog

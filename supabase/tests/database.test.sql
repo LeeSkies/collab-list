@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(36);
+select plan(39);
 
 select has_table('public', 'products', 'products exists');
 select hasnt_table('public', 'product_pick_history', 'history table was removed');
@@ -26,7 +26,10 @@ select is((select quantity::text from public.products where name = 'Test apples'
 select lives_ok($$ select public.toggle_product_picked((select id from public.products where name='Test apples'), (select version from public.products where name='Test apples'), false) $$, 'conditional pick succeeds');
 select is((select updated_by from public.products where name='Test apples'), '10000000-0000-0000-0000-000000000001'::uuid, 'pick stamps the updater');
 select isnt((select updated_at from public.products where name='Test apples'), (select created_at from public.products where name='Test apples'), 'product mutation advances updated_at');
-select throws_ok($$ select public.toggle_product_picked((select id from public.products where name='Test apples'), 1, false) $$, '40001', 'product_conflict', 'stale pick is rejected');
+select throws_ok($$ select public.toggle_product_picked((select id from public.products where name='Test apples'), 1, false) $$, 'PT409', 'product_conflict', 'stale pick returns a conflict');
+select throws_ok($$ select public.adjust_product_quantity((select id from public.products where name='Test apples'), 1, 1) $$, 'PT409', 'product_conflict', 'stale quantity adjustment returns a conflict');
+select throws_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', '', 1) $$, 'PT409', 'product_conflict', 'stale edit returns a conflict');
+select throws_ok($$ select public.delete_product((select id from public.products where name='Test apples'), 1) $$, 'PT409', 'product_conflict', 'stale deletion returns a conflict');
 
 select lives_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', 'seasonal', (select version from public.products where name='Test apples')) $$, 'picked product can be prepared for restore options test');
 select lives_ok($$ select public.restore_all_products(true, true) $$, 'restore all succeeds');

@@ -135,7 +135,8 @@ export function ConfirmDialog({
   body,
   confirmLabel,
   onConfirm,
-  destructive = false
+  destructive = false,
+  pending = false
 }: {
   open: boolean
   onOpenChange(open: boolean): void
@@ -144,6 +145,7 @@ export function ConfirmDialog({
   confirmLabel: string
   onConfirm(): void
   destructive?: boolean
+  pending?: boolean
 }) {
   const { t } = useTranslation()
   return (
@@ -155,13 +157,15 @@ export function ConfirmDialog({
             <Dialog.Title>{title}</Dialog.Title>
             <Dialog.Description>{body}</Dialog.Description>
             <div className="confirm-actions">
-              <Dialog.Close className="button secondary">{t('cancel')}</Dialog.Close>
+              <Dialog.Close className="button secondary" disabled={pending}>
+                {t('cancel')}
+              </Dialog.Close>
               {destructive ? (
-                <button className="button danger" onClick={onConfirm}>
+                <button className="button danger" disabled={pending} onClick={onConfirm}>
                   {confirmLabel}
                 </button>
               ) : (
-                <button className="button" onClick={onConfirm}>
+                <button className="button" disabled={pending} onClick={onConfirm}>
                   {confirmLabel}
                 </button>
               )}

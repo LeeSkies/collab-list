@@ -11,6 +11,10 @@ export class ApiError extends Error {
   }
 }
 
+export function isProductConflict(reason: unknown): reason is ApiError {
+  return reason instanceof ApiError && (reason.code === 'PT409' || reason.code === '40001')
+}
+
 async function unwrap<T>(
   promise: PromiseLike<{ data: T | null; error: { code?: string; message: string } | null }>
 ): Promise<T> {

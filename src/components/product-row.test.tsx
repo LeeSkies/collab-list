@@ -21,12 +21,13 @@ const product: Product = {
   updated_at: '2026-07-13T12:00:00.000Z'
 }
 
-function renderRow(overrides: Partial<Product> = {}) {
+function renderRow(overrides: Partial<Product> = {}, busy = false) {
   const view = render(
     <I18nextProvider i18n={i18n}>
       <ProductRow
         product={{ ...product, ...overrides }}
         duplicatePulse={false}
+        busy={busy}
         onEdit={vi.fn()}
         onAdjust={vi.fn()}
         onToggle={vi.fn()}
@@ -56,5 +57,15 @@ describe('ProductRow', () => {
   it('reveals only an action icon underneath the row', () => {
     const { container } = renderRow()
     expect(container.querySelector('.swipe-reveal')).toHaveTextContent('')
+  })
+
+  it('disables every row action while a product mutation is pending', () => {
+    renderRow({}, true)
+
+    expect(screen.getByRole('button', { name: i18n.t('minus') })).toBeDisabled()
+    expect(screen.getByRole('button', { name: i18n.t('plus') })).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: i18n.t('edit', { name: product.name }) })
+    ).toBeDisabled()
   })
 })
