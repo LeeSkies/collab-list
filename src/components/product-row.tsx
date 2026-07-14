@@ -53,6 +53,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
         drag={reduced ? false : 'x'}
         dragConstraints={{ left: direction < 0 ? -104 : 0, right: direction > 0 ? 104 : 0 }}
         dragElastic={0.08}
+        dragMomentum={false}
         onDrag={(_, info) => setCrossed(info.offset.x * direction >= 76)}
         onDragEnd={(_, info) => {
           if (info.offset.x * direction >= 76) {
@@ -70,6 +71,10 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
             return
           }
           setCrossed(false)
+          void Promise.all([
+            animate(x, 0, { type: 'spring', duration: 0.25, bounce: 0 }),
+            animate(opacity, 1, { duration: 0.15, ease: [0.2, 0, 0, 1] })
+          ])
         }}
         animate={duplicatePulse ? { x: [0, -5, 5, -3, 3, 0] } : undefined}
         transition={{ duration: 0.28, ease: [0.2, 0, 0, 1] }}

@@ -258,40 +258,42 @@ export function GroceryApp() {
               placeholder={t('search')}
               aria-label={t('search')}
             />
-            <AnimatePresence initial={false}>
-              {search && (
-                <motion.button
-                  key="clear-search"
-                  className="search-clear"
-                  type="button"
-                  aria-label={t('clearSearch')}
-                  initial={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
-                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
-                  transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-                  onClick={() => {
-                    setSearch('')
-                    searchRef.current?.focus()
-                  }}
-                >
-                  <X weight="bold" />
-                </motion.button>
-              )}
-            </AnimatePresence>
-            <button
-              className="search-add"
-              aria-disabled={!canCreate}
-              aria-label={
-                canCreate
-                  ? t('create', { name: search })
-                  : duplicate
-                    ? t('duplicate')
-                    : t('create', { name: '' })
-              }
-              onClick={activateCreate}
-            >
-              <Plus weight="bold" />
-            </button>
+            <div className="search-actions">
+              <AnimatePresence initial={false}>
+                {search && (
+                  <motion.button
+                    key="clear-search"
+                    className="search-clear"
+                    type="button"
+                    aria-label={t('clearSearch')}
+                    initial={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
+                    animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
+                    transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+                    onClick={() => {
+                      setSearch('')
+                      searchRef.current?.focus()
+                    }}
+                  >
+                    <X weight="bold" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              <button
+                className="search-add"
+                aria-disabled={!canCreate}
+                aria-label={
+                  canCreate
+                    ? t('create', { name: search })
+                    : duplicate
+                      ? t('duplicate')
+                      : t('create', { name: '' })
+                }
+                onClick={activateCreate}
+              >
+                <Plus weight="bold" />
+              </button>
+            </div>
           </div>
           {connectionWarningEligible && showConnectionWarning && (
             <button

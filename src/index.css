@@ -363,7 +363,8 @@ body::before {
   scrollbar-width: thin;
 }
 .search-shell {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   height: 54px;
@@ -379,13 +380,19 @@ body::before {
   color: var(--muted-foreground);
 }
 .search-shell input {
+  width: 100%;
   min-width: 0;
-  flex: 1;
   border: 0;
   outline: 0;
   background: transparent;
 }
-.search-shell > button {
+.search-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 42px);
+  gap: 4px;
+  width: 88px;
+}
+.search-actions > button {
   display: grid;
   width: 42px;
   height: 42px;
@@ -397,20 +404,26 @@ body::before {
   transition-property: background-color, scale, opacity;
   transition-duration: 150ms;
 }
-.search-shell > .search-clear {
+.search-actions > .search-clear {
+  grid-column: 1;
+  grid-row: 1;
   background: transparent;
   color: var(--muted-foreground);
 }
-.search-shell > .search-clear:hover {
+.search-actions > .search-clear:hover {
   color: var(--foreground);
 }
-.search-shell > button:active {
+.search-actions > .search-add {
+  grid-column: 2;
+  grid-row: 1;
+}
+.search-actions > button:active {
   scale: 0.96;
 }
-.search-shell > button[aria-disabled='true'] {
+.search-actions > button[aria-disabled='true'] {
   opacity: 0.28;
 }
-.search-shell > button svg {
+.search-actions > button svg {
   width: 21px;
 }
 .connection-banner {
