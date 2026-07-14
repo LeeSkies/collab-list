@@ -5,7 +5,15 @@ import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from '
 const HOLD_DELAY = 360
 const MOVE_TOLERANCE = 10
 
-export function HoldToRevealName({ name, children }: { name: string; children?: ReactNode }) {
+export function HoldToRevealName({
+  name,
+  notes,
+  children
+}: {
+  name: string
+  notes?: string | null
+  children?: ReactNode
+}) {
   const textRef = useRef<HTMLSpanElement>(null)
   const timerRef = useRef<number>(0)
   const cleanupRef = useRef<() => void>(() => undefined)
@@ -21,8 +29,7 @@ export function HoldToRevealName({ name, children }: { name: string; children?: 
 
   function startHold(event: PointerEvent<HTMLSpanElement>) {
     if (event.isPrimary === false || event.button !== 0) return
-    const element = textRef.current
-    if (!element || element.scrollWidth <= element.clientWidth + 1) return
+    if (!textRef.current) return
 
     stopTracking()
     suppressClickRef.current = false
@@ -91,7 +98,8 @@ export function HoldToRevealName({ name, children }: { name: string; children?: 
               exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
               transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
             >
-              {name}
+              <strong>{name}</strong>
+              {notes && <span>{notes}</span>}
             </motion.div>
           )}
         </AnimatePresence>,

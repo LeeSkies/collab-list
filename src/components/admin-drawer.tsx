@@ -75,7 +75,7 @@ export function AdminDrawer({
               {error}
             </p>
           )}
-          <Button className="button" size="lg" type="submit" disabled={create.isPending}>
+          <Button size="lg" type="submit" disabled={create.isPending}>
             {create.isPending ? t('creatingUser') : t('createUser')}
           </Button>
         </form>

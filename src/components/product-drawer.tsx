@@ -94,7 +94,7 @@ export function ProductDrawer({
       <AppDrawer
         open={open}
         onOpenChange={requestClose}
-        title={<HoldToRevealName name={product.name} />}
+        title={<HoldToRevealName name={product.name} notes={product.notes} />}
         className="product-drawer"
         headerAction={
           <button

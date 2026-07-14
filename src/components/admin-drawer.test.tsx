@@ -57,7 +57,10 @@ describe('AdminDrawer', () => {
     expect(name).toHaveAttribute('maxlength', '80')
     expect(await screen.findByText('Dana')).toBeVisible()
     expect(screen.getByText('dana@example.com')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Create user' })).toHaveClass('button')
+    expect(screen.getByRole('button', { name: 'Create user' })).toHaveAttribute(
+      'data-slot',
+      'button'
+    )
 
     await user.type(name, 'Noa')
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'noa@example.com')

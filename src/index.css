@@ -70,7 +70,7 @@ input,
 textarea {
   font: inherit;
 }
-button {
+button:not([data-slot='button']) {
   color: inherit;
 }
 button:not(:disabled) {
@@ -393,9 +393,16 @@ body::before {
   border: 0;
   border-radius: 12px;
   background: var(--primary);
-  color: white;
+  color: var(--primary-foreground);
   transition-property: background-color, scale, opacity;
   transition-duration: 150ms;
+}
+.search-shell > .search-clear {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.search-shell > .search-clear:hover {
+  color: var(--foreground);
 }
 .search-shell > button:active {
   scale: 0.96;
@@ -563,13 +570,22 @@ body::before {
     0 10px 30px rgb(20 28 23 / 0.2),
     0 2px 8px rgb(20 28 23 / 0.12);
   color: var(--background);
+  display: grid;
+  gap: 4px;
   font-size: 14px;
-  font-weight: 750;
   line-height: 1.45;
   overflow-wrap: anywhere;
   pointer-events: none;
   text-align: start;
   text-wrap: pretty;
+}
+.held-name-reveal strong {
+  font-weight: 750;
+}
+.held-name-reveal span {
+  color: color-mix(in oklab, var(--background), transparent 18%);
+  font-size: 12px;
+  font-weight: 500;
 }
 .product-main > span {
   overflow: hidden;

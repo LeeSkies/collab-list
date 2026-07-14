@@ -16,7 +16,7 @@ function renderTruncatedName() {
 }
 
 describe('HoldToRevealName', () => {
-  it('reveals a truncated name after holding and starts an animated exit on finger lift', () => {
+  it('reveals a name after holding and starts an animated exit on finger lift', () => {
     const name = renderTruncatedName()
     fireEvent.pointerDown(name, {
       pointerId: 1,
@@ -73,7 +73,7 @@ describe('HoldToRevealName', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
-  it('does nothing when the full name already fits', () => {
+  it('reveals a name even when the full name already fits', () => {
     const { container } = render(<HoldToRevealName name="Milk" />)
     const name = container.querySelector('.hold-name')!
     Object.defineProperties(name, {
@@ -89,6 +89,23 @@ describe('HoldToRevealName', () => {
     })
     act(() => vi.advanceTimersByTime(500))
 
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Milk')
+  })
+
+  it('shows notes under the product name', () => {
+    const { container } = render(<HoldToRevealName name="Milk" notes="Only if it is on sale" />)
+    const name = container.querySelector('.hold-name')!
+    fireEvent.pointerDown(name, {
+      pointerId: 5,
+      isPrimary: true,
+      button: 0,
+      clientX: 20,
+      clientY: 20
+    })
+    act(() => vi.advanceTimersByTime(360))
+
+    const tooltip = screen.getByRole('tooltip')
+    expect(tooltip.querySelector('strong')).toHaveTextContent('Milk')
+    expect(tooltip.querySelector('span')).toHaveTextContent('Only if it is on sale')
   })
 })

@@ -81,7 +81,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
           aria-label={t('edit', { name: product.name })}
         >
           <strong>
-            <HoldToRevealName name={product.name} />
+            <HoldToRevealName name={product.name} notes={product.notes} />
           </strong>
           {product.notes && <span>{product.notes}</span>}
         </button>
