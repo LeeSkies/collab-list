@@ -117,34 +117,23 @@ export function ProductDrawer({
           </Button>
         }
       >
-        <dl className="product-audit">
-          <div>
-            <dt>{t('createdAt')}</dt>
-            <dd>
-              <time dateTime={product.created_at}>{formatAuditDate(product.created_at)}</time>
-            </dd>
-          </div>
-          <div>
-            <dt>{t('updatedAt')}</dt>
-            <dd className="audit-update">
-              <time dateTime={product.updated_at}>{formatAuditDate(product.updated_at)}</time>
-              {product.updated_by && (
-                <span
-                  className="audit-user"
-                  title={updatedBy.data?.name}
-                  aria-label={
-                    updatedBy.data ? t('updatedBy', { name: updatedBy.data.name }) : undefined
-                  }
-                >
-                  <span className="audit-avatar" aria-hidden="true">
-                    {updatedBy.data ? nameInitial(updatedBy.data.name) : '…'}
-                  </span>
-                  <span>{updatedBy.data?.name ?? (updatedBy.isLoading ? '…' : '—')}</span>
-                </span>
-              )}
-            </dd>
-          </div>
-        </dl>
+        <div className="product-audit" role="group" aria-label={t('updatedAt')}>
+          <time dateTime={product.updated_at}>{formatAuditDate(product.updated_at)}</time>
+          {product.updated_by && (
+            <span
+              className="audit-user"
+              title={updatedBy.data?.name}
+              aria-label={
+                updatedBy.data ? t('updatedBy', { name: updatedBy.data.name }) : undefined
+              }
+            >
+              <span className="audit-avatar" aria-hidden="true">
+                {updatedBy.data ? nameInitial(updatedBy.data.name) : '…'}
+              </span>
+              <span>{updatedBy.data?.name ?? (updatedBy.isLoading ? '…' : '—')}</span>
+            </span>
+          )}
+        </div>
         <form id={formId} className="drawer-form" onSubmit={submit}>
           <label className="notes-field">
             <span>{t('appName').includes('ה') ? 'שם המוצר' : 'Product name'}</span>

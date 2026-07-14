@@ -59,8 +59,8 @@ describe('ProductDrawer notes', () => {
     renderDrawer(onSave)
 
     expect(screen.getByRole('heading', { name: 'Milk' })).toBeVisible()
-    expect(screen.getByText('Created')).toBeVisible()
-    expect(screen.getByText('Updated')).toBeVisible()
+    expect(screen.queryByText('Created')).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Updated' })).toBeVisible()
     expect(await screen.findByText('Lee')).toBeVisible()
     expect(screen.queryByRole('button', { name: /history/i })).not.toBeInTheDocument()
     const notes = screen.getByRole('textbox', { name: /Notes/ })
