@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import type { AdminUser, PickHistory, Product, Profile } from './types'
+import type { AdminUser, Product, Profile } from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -86,17 +86,6 @@ export const api = {
       )
     }
   },
-  history: {
-    list: (productId: string) =>
-      unwrap<PickHistory[]>(
-        supabase
-          .from('product_pick_history')
-          .select('*')
-          .eq('product_id', productId)
-          .order('picked_at', { ascending: false })
-          .order('id', { ascending: false })
-      )
-  },
   profile: {
     current: (id: string) =>
       unwrap<Profile>(supabase.from('profiles').select('*').eq('id', id).single())
@@ -120,11 +109,6 @@ export const api = {
       return supabase
         .channel('shared-products')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, onChange)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'product_pick_history' },
-          onChange
-        )
         .subscribe(onStatus)
     }
   }

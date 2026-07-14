@@ -13,9 +13,10 @@ const boughtProduct: Product = {
   notes: null,
   is_picked: true,
   picked_at: '2026-07-13T12:00:00.000Z',
-  picked_by: null,
   ordering_at: '2026-07-13T12:00:00.000Z',
   version: 1,
+  created_by: '10000000-0000-0000-0000-000000000001',
+  updated_by: '10000000-0000-0000-0000-000000000001',
   created_at: '2026-07-13T12:00:00.000Z',
   updated_at: '2026-07-13T12:00:00.000Z'
 }

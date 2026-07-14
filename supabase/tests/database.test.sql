@@ -1,13 +1,13 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(32);
 
 select has_table('public', 'products', 'products exists');
-select has_table('public', 'product_pick_history', 'history exists');
+select hasnt_table('public', 'product_pick_history', 'history table was removed');
 select has_table('public', 'profiles', 'profiles exists');
 select col_type_is('public', 'products', 'quantity', 'numeric(5,2)', 'quantity is exact numeric');
 select col_is_pk('public', 'products', 'id', 'product id is primary key');
-select fk_ok('public', 'product_pick_history', 'product_id', 'public', 'products', 'id', 'history references products');
+select fk_ok('public', 'products', 'updated_by', 'public', 'profiles', 'id', 'product updater references profiles');
 select is(public.product_name_signature('soy milk'), public.product_name_signature('Milk-Soy'), 'unordered case-insensitive tokens collide');
 select isnt(public.product_name_signature('milk milk'), public.product_name_signature('milk'), 'token counts remain distinct');
 select is(public.normalize_product_name('  חלב   סויה '), 'חלב סויה', 'Hebrew whitespace normalizes');
@@ -20,8 +20,8 @@ select is((select quantity::text from public.products where name = 'Test apples'
 select lives_ok($$ select public.adjust_product_quantity((select id from public.products where name='Test apples'), 1, (select version from public.products where name='Test apples')) $$, 'atomic increment succeeds');
 select is((select quantity::text from public.products where name = 'Test apples'), '2.00', 'atomic increment changes by one');
 select lives_ok($$ select public.toggle_product_picked((select id from public.products where name='Test apples'), (select version from public.products where name='Test apples'), false) $$, 'conditional pick succeeds');
-select is((select count(*)::integer from public.product_pick_history h join public.products p on p.id=h.product_id where p.name='Test apples'), 1, 'pick appends exactly one history event');
-select is((select picked_by_email from public.product_pick_history h join public.products p on p.id=h.product_id where p.name='Test apples'), 'admin@example.com', 'history snapshots the actor email');
+select is((select updated_by from public.products where name='Test apples'), '10000000-0000-0000-0000-000000000001'::uuid, 'pick stamps the updater');
+select isnt((select updated_at from public.products where name='Test apples'), (select created_at from public.products where name='Test apples'), 'product mutation advances updated_at');
 select throws_ok($$ select public.toggle_product_picked((select id from public.products where name='Test apples'), 1, false) $$, '40001', 'product_conflict', 'stale pick is rejected');
 
 select lives_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', 'seasonal', (select version from public.products where name='Test apples')) $$, 'picked product can be prepared for restore options test');
@@ -36,6 +36,10 @@ select lives_ok($$ select public.toggle_product_picked((select id from public.pr
 select lives_ok($$ select public.restore_all_products(false, false) $$, 'restore all without resets succeeds');
 select is((select notes from public.products where name='Test milk'), 'keep cold', 'restore all can preserve notes');
 select is((select quantity from public.products where name='Test milk'), 3::numeric, 'restore all can preserve quantities');
+
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
+select lives_ok($$ select public.adjust_product_quantity((select id from public.products where name='Test milk'), 1, (select version from public.products where name='Test milk')) $$, 'member can update a product');
+select is((select updated_by from public.products where name='Test milk'), '10000000-0000-0000-0000-000000000002'::uuid, 'latest mutation stamps the member as updater');
 
 set local role anon;
 select throws_ok(

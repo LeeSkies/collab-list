@@ -848,29 +848,66 @@ body::before {
   );
   transition: transform 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1));
 }
-.history-summary {
-  display: flex;
-  min-height: 48px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.product-audit {
+  display: grid;
+  gap: 7px;
   margin: 0 0 18px;
-  padding-block: 3px;
-  padding-inline-start: 12px;
-  padding-inline-end: 4px;
+  padding: 11px 12px;
   border-radius: 10px;
   background: var(--secondary);
-  font-size: 12px;
   color: var(--secondary-foreground);
 }
-.history-summary > span {
+.product-audit > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.product-audit dt {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.product-audit dd {
+  min-width: 0;
+  margin: 0;
+  text-align: end;
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.audit-update {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.audit-user {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+.audit-user > span:last-child {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.history-summary .icon-button {
-  flex: 0 0 42px;
+.audit-avatar {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--primary) 14%, var(--background));
+  color: var(--primary);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
 }
 .drawer-form label > span,
 .admin-create label > span {
@@ -941,53 +978,6 @@ body::before {
 }
 .drawer-form > button:nth-last-child(2) {
   min-height: 44px;
-}
-.history-list {
-  display: grid;
-  gap: 2px;
-}
-.history-list article {
-  display: grid;
-  grid-template-columns: 32px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 4px;
-  border-bottom: 1px solid var(--border);
-}
-.history-list article > div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-.history-list strong {
-  font-size: 13px;
-}
-.history-list span,
-.history-list time {
-  color: var(--muted-foreground);
-  font-size: 11px;
-}
-.history-list article > div span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.history-avatar {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: 50%;
-  background: color-mix(in oklab, var(--primary) 14%, var(--background));
-  color: var(--primary);
-  font-size: 12px !important;
-  font-weight: 700;
-  line-height: 1;
-}
-.empty-note {
-  padding: 36px 0;
-  text-align: center;
-  color: var(--muted-foreground);
 }
 .confirm-viewport {
   position: fixed;

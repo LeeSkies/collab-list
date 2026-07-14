@@ -16,20 +16,12 @@ export interface Product {
   notes: string | null
   is_picked: boolean
   picked_at: string | null
-  picked_by: string | null
   ordering_at: string
   version: number
+  created_by: string
+  updated_by: string | null
   created_at: string
   updated_at: string
-}
-
-export interface PickHistory {
-  id: string
-  product_id: string
-  picked_at: string
-  picked_by: string | null
-  picked_by_email: string
-  created_at: string
 }
 
 export interface AdminUser {

@@ -1,4 +1,4 @@
-import { Eraser, ListBullets, Trash } from '@phosphor-icons/react'
+import { Eraser, Trash } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useMemo, useState, type FormEvent } from 'react'
@@ -11,7 +11,7 @@ import {
   PRODUCT_NOTES_MAX,
   validateQuantity
 } from '../lib/product'
-import type { PickHistory, Product } from '../lib/types'
+import type { Product } from '../lib/types'
 import { AppDrawer, ConfirmDialog } from './drawer'
 import { HoldToRevealName } from './hold-to-reveal-name'
 import { Button } from './ui/button'
@@ -47,15 +47,13 @@ export function ProductDrawer({
   const [values, setValues] = useState(productValues)
   const [initial, setInitial] = useState(values)
   const [error, setError] = useState('')
-  const [historyOpen, setHistoryOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
-  const history = useQuery({
-    queryKey: ['history', product.id],
-    queryFn: () => api.history.list(product.id),
-    enabled: open
+  const updatedBy = useQuery({
+    queryKey: ['profile', product.updated_by],
+    queryFn: () => api.profile.current(product.updated_by!),
+    enabled: open && Boolean(product.updated_by)
   })
-  const latestPick = history.data?.[0]
   const formId = `product-form-${product.id}`
 
   const dirty = JSON.stringify(values) !== JSON.stringify(initial)
@@ -118,38 +116,35 @@ export function ProductDrawer({
             {pending ? t('saving') : t('save')}
           </Button>
         }
-        nested={
-          <HistoryDrawer
-            product={product}
-            entries={history.data}
-            isLoading={history.isLoading}
-            isError={history.isError}
-            open={historyOpen}
-            onOpenChange={setHistoryOpen}
-          />
-        }
       >
-        <div className="history-summary">
-          <span>
-            {history.isLoading
-              ? t('historyLoading')
-              : history.isError
-                ? t('requestFailed')
-                : latestPick
-                  ? t('lastPicked', { date: relativeDate(latestPick.picked_at, t) })
-                  : t('noHistory')}
-          </span>
-          <button
-            className="icon-button"
-            onClick={() => {
-              setHistoryOpen(true)
-              void history.refetch()
-            }}
-            aria-label={t('history')}
-          >
-            <ListBullets weight="bold" />
-          </button>
-        </div>
+        <dl className="product-audit">
+          <div>
+            <dt>{t('createdAt')}</dt>
+            <dd>
+              <time dateTime={product.created_at}>{formatAuditDate(product.created_at)}</time>
+            </dd>
+          </div>
+          <div>
+            <dt>{t('updatedAt')}</dt>
+            <dd className="audit-update">
+              <time dateTime={product.updated_at}>{formatAuditDate(product.updated_at)}</time>
+              {product.updated_by && (
+                <span
+                  className="audit-user"
+                  title={updatedBy.data?.email}
+                  aria-label={
+                    updatedBy.data ? t('updatedBy', { email: updatedBy.data.email }) : undefined
+                  }
+                >
+                  <span className="audit-avatar" aria-hidden="true">
+                    {updatedBy.data ? emailInitial(updatedBy.data.email) : '…'}
+                  </span>
+                  <span>{updatedBy.data?.email ?? (updatedBy.isLoading ? '…' : '—')}</span>
+                </span>
+              )}
+            </dd>
+          </div>
+        </dl>
         <form id={formId} className="drawer-form" onSubmit={submit}>
           <label className="notes-field">
             <span>{t('appName').includes('ה') ? 'שם המוצר' : 'Product name'}</span>
@@ -232,64 +227,10 @@ export function ProductDrawer({
   )
 }
 
-function HistoryDrawer({
-  product,
-  entries,
-  isLoading,
-  isError,
-  open,
-  onOpenChange
-}: {
-  product: Product
-  entries?: PickHistory[]
-  isLoading: boolean
-  isError: boolean
-  open: boolean
-  onOpenChange(open: boolean): void
-}) {
-  const { t } = useTranslation()
-  return (
-    <AppDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t('history')}
-      description={product.name}
-      className="history-drawer"
-    >
-      <div className="history-list">
-        {isLoading ? (
-          <p>{t('historyLoading')}</p>
-        ) : isError ? (
-          <p className="empty-note">{t('requestFailed')}</p>
-        ) : entries?.length ? (
-          entries.map((entry) => (
-            <article key={entry.id}>
-              <span className="history-avatar" aria-hidden="true">
-                {emailInitial(entry.picked_by_email)}
-              </span>
-              <div>
-                <strong>{relativeDate(entry.picked_at, t)}</strong>
-                <span>{t('pickedBy', { email: entry.picked_by_email })}</span>
-              </div>
-              <time>{dayjs(entry.picked_at).format('LT')}</time>
-            </article>
-          ))
-        ) : (
-          <p className="empty-note">{t('noHistory')}</p>
-        )}
-      </div>
-    </AppDrawer>
-  )
-}
-
 function emailInitial(email: string) {
   return Array.from(email.trim())[0]?.toLocaleUpperCase() ?? '?'
 }
 
-function relativeDate(value: string, t: (key: string) => string) {
-  const date = dayjs(value)
-  const today = dayjs()
-  if (date.isSame(today, 'day')) return t('today')
-  if (date.isSame(today.subtract(1, 'day'), 'day')) return t('yesterday')
-  return date.format('L')
+function formatAuditDate(value: string) {
+  return dayjs(value).format('L LT')
 }

@@ -74,7 +74,6 @@ export function GroceryApp() {
   useEffect(() => {
     const refreshRealtimeData = () => {
       void client.invalidateQueries({ queryKey: ['products'] })
-      void client.invalidateQueries({ queryKey: ['history'] })
     }
     const channel = api.realtime.subscribe(refreshRealtimeData, (status) => {
       setRealtime(
