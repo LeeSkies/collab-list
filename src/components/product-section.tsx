@@ -7,6 +7,8 @@ export function ProductSection({
   title,
   products,
   duplicatePulse,
+  enteringProductIds,
+  onEntranceComplete,
   busyProductIds,
   bulkBusy = false,
   onEdit,
@@ -18,6 +20,8 @@ export function ProductSection({
   title: string
   products: Product[]
   duplicatePulse: string
+  enteringProductIds?: ReadonlySet<string>
+  onEntranceComplete?(productId: string): void
   busyProductIds?: ReadonlySet<string>
   bulkBusy?: boolean
   onEdit(product: Product): void
@@ -42,6 +46,8 @@ export function ProductSection({
               key={product.id}
               product={product}
               duplicatePulse={duplicatePulse === product.id}
+              animateEntrance={enteringProductIds?.has(product.id)}
+              onEntranceComplete={() => onEntranceComplete?.(product.id)}
               busy={bulkBusy || busyProductIds?.has(product.id)}
               onEdit={() => onEdit(product)}
               onAdjust={(delta) => onAdjust(product, delta)}

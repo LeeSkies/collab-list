@@ -42,6 +42,7 @@ export function GroceryApp() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [restoreAllOpen, setRestoreAllOpen] = useState(false)
   const [duplicatePulse, setDuplicatePulse] = useState('')
+  const [enteringProductIds, setEnteringProductIds] = useState<ReadonlySet<string>>(new Set())
   const [toast, setToast] = useState('')
   const [online, setOnline] = useState(navigator.onLine)
   const [realtime, setRealtime] = useState('connecting')
@@ -182,6 +183,14 @@ export function GroceryApp() {
     mutationCoordinator.current.unlockBulk()
     syncMutationState()
   }
+  function completeEntrance(productId: string) {
+    setEnteringProductIds((current) => {
+      if (!current.has(productId)) return current
+      const next = new Set(current)
+      next.delete(productId)
+      return next
+    })
+  }
   function replaceProduct(next: Product) {
     client.setQueryData<Product[]>(['products'], (current = []) =>
       current.map((product) => (product.id === next.id ? next : product))
@@ -195,6 +204,7 @@ export function GroceryApp() {
   const create = useMutation({
     mutationFn: api.products.create,
     onSuccess: (product) => {
+      setEnteringProductIds((current) => new Set(current).add(product.id))
       client.setQueryData<Product[]>(['products'], (current = []) => [
         product,
         ...current.filter((item) => item.id !== product.id)
@@ -441,6 +451,8 @@ export function GroceryApp() {
                 title={t('unpicked')}
                 products={unpicked}
                 duplicatePulse={duplicatePulse}
+                enteringProductIds={enteringProductIds}
+                onEntranceComplete={completeEntrance}
                 busyProductIds={mutationState.productIds}
                 bulkBusy={mutationState.bulk}
                 onEdit={setSelected}
@@ -466,6 +478,8 @@ export function GroceryApp() {
                   </button>
                 }
                 duplicatePulse={duplicatePulse}
+                enteringProductIds={enteringProductIds}
+                onEntranceComplete={completeEntrance}
                 busyProductIds={mutationState.productIds}
                 bulkBusy={mutationState.bulk}
                 onEdit={setSelected}

@@ -9,6 +9,8 @@ import { HoldToRevealName } from './hold-to-reveal-name'
 interface ProductRowProps {
   product: Product
   duplicatePulse: boolean
+  animateEntrance?: boolean
+  onEntranceComplete?(): void
   busy?: boolean
   onEdit(): void
   onAdjust(delta: 1 | -1): void
@@ -16,7 +18,16 @@ interface ProductRowProps {
 }
 
 export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function ProductRow(
-  { product, duplicatePulse, busy = false, onEdit, onAdjust, onToggle },
+  {
+    product,
+    duplicatePulse,
+    animateEntrance = false,
+    onEntranceComplete,
+    busy = false,
+    onEdit,
+    onAdjust,
+    onToggle
+  },
   ref
 ) {
   const { t, i18n } = useTranslation()
@@ -38,12 +49,14 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
     <motion.li
       ref={ref}
       layout={!reduced && canReflow ? 'position' : false}
+      layoutId={`product-${product.id}`}
       data-product-id={product.id}
       className={`product-wrap ${duplicatePulse ? 'duplicate-pulse' : ''}`}
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={animateEntrance ? (reduced ? { opacity: 0 } : { opacity: 0, scale: 0.9 }) : false}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0 }}
       transition={{ type: 'spring', duration: 0.24, bounce: 0 }}
+      onAnimationComplete={animateEntrance ? onEntranceComplete : undefined}
     >
       <motion.div className="swipe-reveal" style={{ opacity: backgroundOpacity }}>
         {product.is_picked ? <ArrowCounterClockwise weight="bold" /> : <Check weight="bold" />}
