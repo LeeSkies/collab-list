@@ -10,5 +10,10 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     coverage: { provider: 'v8', reporter: ['text', 'html'] }
   },
-  resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } }
+  resolve: {
+    alias: {
+      '@': new URL('./src', import.meta.url).pathname,
+      'virtual:pwa-register/react': new URL('./src/test/pwa-register.ts', import.meta.url).pathname
+    }
+  }
 })

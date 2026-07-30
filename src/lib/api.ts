@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import type { AdminUser, Product, Profile } from './types'
+import type { AdminUser, Product, ProductChanges, Profile } from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -88,16 +88,14 @@ export const api = {
           p_reset_quantities: resetQuantities
         })
       ),
-    update: async (
-      product: Product,
-      changes: { name: string; quantity: string; notes: string }
-    ) => {
+    update: async (product: Product, changes: ProductChanges) => {
       const rows = await unwrap<Product[]>(
         supabase.rpc('update_product', {
           p_product_id: product.id,
           p_name: changes.name,
           p_quantity: changes.quantity,
           p_notes: changes.notes,
+          p_category: changes.category,
           p_expected_version: product.version
         })
       )

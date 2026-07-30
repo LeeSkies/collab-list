@@ -65,12 +65,15 @@ One editable `products` table is the shared list. Each row owns:
 - `name` and its database-enforced duplicate signature;
 - exact decimal `quantity`;
 - optional `notes`;
+- a non-null category key;
 - `is_picked` and the timestamp/actor metadata needed for ordering and concurrency;
 - an optimistic concurrency version;
 - `created_at`; and
 - `updated_at`.
 
 `quantity` uses an exact PostgreSQL decimal/numeric representation, never binary floating point. It is inclusive from `1` through `999` and has at most two fractional digits.
+
+`category` is a database-validated stable key. Supported keys are `fruit_vegetables`, `dairy_eggs`, `meat_fish`, `bakery`, `pantry`, `frozen`, `drinks`, `snacks`, `household`, and `other`. Existing rows and quick-created products default to `other`; translated labels are presentation only.
 
 Every editable application table has `created_at` and `updated_at`. A database trigger maintains `updated_at` on every accepted update. Supabase does not add or maintain these columns automatically.
 
@@ -148,7 +151,7 @@ Create and rename use this same signature in application validation and an immut
 
 The trailing plus is the sole creation path. It is inactive for empty normalized input and duplicate input. A duplicate plus uses `aria-disabled="true"`, not native `disabled`, so it remains event-capable for feedback. Activating it creates nothing, places the matching product first in the filtered order, and briefly shakes that row. The effect is subtle and has a reduced-motion alternative.
 
-For valid distinct input, activation creates exactly one product with default quantity `1` and empty notes. Clear and refocus the input only after server success. On failure or timeout, preserve the input and show a retryable message. Creation does not open an intermediate drawer and does not add an existing product.
+For valid distinct input, activation creates exactly one product with default quantity `1`, empty notes, and category `other`. Clear and refocus the input only after server success. On failure or timeout, preserve the input and show a retryable message. Creation does not open an intermediate drawer and does not add an existing product.
 
 ## 9. Product row
 
@@ -164,7 +167,7 @@ Row plus and minus operations change quantity by exactly `1` through atomic data
 
 ## 11. Product edit drawer
 
-The drawer edits name, direct quantity, and notes. Names are 1–80 Unicode code points after `NFKC`, trimming outer whitespace, and collapsing internal whitespace. Notes are optional plain text up to 500 Unicode code points; preserve intentional internal line breaks while trimming empty outer whitespace and blank outer lines.
+The drawer edits name, direct quantity, category, and notes. Category uses an accessible select with translated English and Hebrew labels while saves persist only stable category keys. Names are 1–80 Unicode code points after `NFKC`, trimming outer whitespace, and collapsing internal whitespace. Notes are optional plain text up to 500 Unicode code points; preserve intentional internal line breaks while trimming empty outer whitespace and blank outer lines.
 
 History sits at block-start/inline-start and Delete at block-start/inline-end. Use logical properties so placement mirrors naturally between Hebrew and English. A currently picked product also displays its latest pick event at the drawer top.
 
@@ -291,6 +294,7 @@ Automate:
 Automate:
 
 - exact decimal storage/calculation at `1`, `999`, valid two-place fractions, invalid precision, and out-of-range values;
+- category defaults, all supported stable keys, database rejection of invalid keys, translated select labels, and versioned category saves;
 - exact `+1`/`-1` atomic steps and unavailable boundary controls;
 - direct quantity validation, 1–80-code-point names, and 500-code-point notes with newline/outer-whitespace behavior;
 - explicit Save dirty/valid states and dirty-close confirmation;

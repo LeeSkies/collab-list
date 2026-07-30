@@ -67,6 +67,7 @@ body {
 }
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -78,6 +79,7 @@ button:not(:disabled) {
 }
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 textarea:focus-visible {
   outline: 3px solid color-mix(in oklab, var(--ring), transparent 55%);
   outline-offset: 2px;
@@ -930,6 +932,7 @@ body::before {
   font-weight: 500;
 }
 .drawer-form input,
+.drawer-form select,
 .drawer-form textarea,
 .admin-create input {
   width: 100%;

@@ -26,7 +26,7 @@ import {
   rollbackOptimisticProduct,
   type ProductMutationState
 } from '../lib/product-mutation-coordinator'
-import type { Product } from '../lib/types'
+import type { Product, ProductChanges } from '../lib/types'
 import { TrailingRefresh } from '../lib/trailing-refresh'
 import { AdminDrawer } from './admin-drawer'
 import { ProductDrawer } from './product-drawer'
@@ -118,6 +118,9 @@ export function GroceryApp() {
   }, [connectionWarningEligible])
 
   const list = useMemo(() => products.data ?? [], [products.data])
+  const selectedProduct = selected
+    ? (list.find((product) => product.id === selected.id) ?? selected)
+    : null
   const { unpicked, picked } = useMemo(() => orderProductSections(list, search), [list, search])
   const signature = duplicateSignature(search)
   const duplicate = signature
@@ -264,13 +267,8 @@ export function GroceryApp() {
     }
   })
   const update = useMutation({
-    mutationFn: ({
-      product,
-      changes
-    }: {
-      product: Product
-      changes: { name: string; quantity: string; notes: string }
-    }) => api.products.update(product, changes),
+    mutationFn: ({ product, changes }: { product: Product; changes: ProductChanges }) =>
+      api.products.update(product, changes),
     onSuccess: (next) => {
       replaceProduct(next)
       setSelected(next)
@@ -338,10 +336,7 @@ export function GroceryApp() {
     }
   }
 
-  async function saveProduct(
-    product: Product,
-    changes: { name: string; quantity: string; notes: string }
-  ) {
+  async function saveProduct(product: Product, changes: ProductChanges) {
     if (!lockProduct(product.id)) throw new ApiError('busy', 'Product update already in progress')
     try {
       await update.mutateAsync({ product, changes })
@@ -494,14 +489,15 @@ export function GroceryApp() {
           )}
         </div>
       </section>
-      {selected && (
+      {selected && selectedProduct && (
         <ProductDrawer
           key={selected.id}
           product={selected}
+          authoritativeProduct={selectedProduct}
           products={list}
-          open={Boolean(selected)}
+          open={Boolean(selectedProduct)}
           onOpenChange={(open) => !open && setSelected(null)}
-          pending={mutationState.bulk || mutationState.productIds.has(selected.id)}
+          pending={mutationState.bulk || mutationState.productIds.has(selectedProduct.id)}
           onSave={saveProduct}
           onDelete={deleteProduct}
           onToggle={toggleProduct}

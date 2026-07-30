@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, isProductConflict } from '../lib/api'
+import { PRODUCT_CATEGORIES } from '../lib/product-category'
 import {
   duplicateSignature,
   normalizeNameForStorage,
@@ -11,13 +12,14 @@ import {
   PRODUCT_NOTES_MAX,
   validateQuantity
 } from '../lib/product'
-import type { Product } from '../lib/types'
+import type { Product, ProductChanges } from '../lib/types'
 import { AppDrawer, ConfirmDialog } from './drawer'
 import { HoldToRevealName } from './hold-to-reveal-name'
 import { Button } from './ui/button'
 
 export function ProductDrawer({
   product,
+  authoritativeProduct = product,
   products,
   open,
   onOpenChange,
@@ -27,13 +29,11 @@ export function ProductDrawer({
   pending
 }: {
   product: Product
+  authoritativeProduct?: Product
   products: Product[]
   open: boolean
   onOpenChange(open: boolean): void
-  onSave(
-    product: Product,
-    changes: { name: string; quantity: string; notes: string }
-  ): Promise<void>
+  onSave(product: Product, changes: ProductChanges): Promise<void>
   onDelete(product: Product): Promise<void>
   onToggle(product: Product): void
   pending: boolean
@@ -46,6 +46,7 @@ export function ProductDrawer({
   }
   const [values, setValues] = useState(productValues)
   const [initial, setInitial] = useState(values)
+  const [categoryEdit, setCategoryEdit] = useState<Product['category'] | null>(null)
   const [error, setError] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
@@ -56,7 +57,9 @@ export function ProductDrawer({
   })
   const formId = `product-form-${product.id}`
 
-  const dirty = JSON.stringify(values) !== JSON.stringify(initial)
+  const category = categoryEdit ?? authoritativeProduct.category
+  const dirty =
+    JSON.stringify(values) !== JSON.stringify(initial) || category !== authoritativeProduct.category
   const validation = useMemo(() => {
     const name = normalizeNameForStorage(values.name)
     if ([...name].length < 1 || [...name].length > PRODUCT_NAME_MAX) return t('invalidName')
@@ -78,9 +81,11 @@ export function ProductDrawer({
       await onSave(product, {
         name: normalizeNameForStorage(values.name),
         quantity: values.quantity,
-        notes: values.notes.trim()
+        notes: values.notes.trim(),
+        category
       })
       setInitial(values)
+      setCategoryEdit(null)
       onOpenChange(false)
     } catch (reason) {
       setError(isProductConflict(reason) ? t('conflict') : t('requestFailed'))
@@ -153,6 +158,23 @@ export function ProductDrawer({
               value={values.quantity}
               onChange={(event) => setValues({ ...values, quantity: event.target.value })}
             />
+          </label>
+          <label>
+            <span>{t('category')}</span>
+            <select
+              value={category}
+              onChange={(event) =>
+                setCategoryEdit(
+                  PRODUCT_CATEGORIES.find((category) => category === event.target.value) ?? 'other'
+                )
+              }
+            >
+              {PRODUCT_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {t(`category_${category}`)}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             <span>

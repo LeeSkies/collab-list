@@ -6,6 +6,47 @@ vi.mock('./supabase', () => ({ supabase: { from, rpc } }))
 
 import { api, ApiError, isProductConflict } from './api'
 
+describe('products.update', () => {
+  beforeEach(() => {
+    from.mockReset()
+    rpc.mockReset()
+  })
+
+  it('sends the category key through the versioned update RPC', async () => {
+    rpc.mockResolvedValue({ data: [{ category: 'pantry' }], error: null })
+
+    const result = await api.products.update(
+      {
+        id: '10000000-0000-0000-0000-000000000003',
+        name: 'Milk',
+        name_signature: '4:milk',
+        quantity: '2.00',
+        notes: null,
+        category: 'other',
+        is_picked: false,
+        picked_at: null,
+        ordering_at: '2026-07-13T12:00:00.000Z',
+        version: 7,
+        created_by: '10000000-0000-0000-0000-000000000001',
+        updated_by: '10000000-0000-0000-0000-000000000001',
+        created_at: '2026-07-13T12:00:00.000Z',
+        updated_at: '2026-07-13T12:00:00.000Z'
+      },
+      { name: 'Milk', quantity: '2.00', notes: '', category: 'pantry' }
+    )
+
+    expect(rpc).toHaveBeenCalledWith('update_product', {
+      p_product_id: '10000000-0000-0000-0000-000000000003',
+      p_name: 'Milk',
+      p_quantity: '2.00',
+      p_notes: '',
+      p_category: 'pantry',
+      p_expected_version: 7
+    })
+    expect(result).toMatchObject({ category: 'pantry' })
+  })
+})
+
 describe('products.restoreAll', () => {
   beforeEach(() => {
     from.mockReset()
