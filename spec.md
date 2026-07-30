@@ -99,9 +99,11 @@ Privileged Auth operations run in trusted Supabase execution, such as an Edge Fu
 
 ## 7. Main list and ordering
 
-Unpicked products appear first and sort newest first using the ordering timestamp and stable ID tie-breaker. Picked products follow, appear visually muted, and sort by their most recent pick event, newest first, with stable ID tie-breaking. Restoring a product updates its unpicked ordering timestamp so it moves to the top of the unpicked section.
+Unpicked products appear first and picked products follow as separate top-level sections in every sorting mode. A compact, visibly labeled control cycles through Default, Name, and Category, and the selected mode persists locally across reloads.
 
-Local and remote changes use the same restrained transition language when rows move between sections. Neither section is collapsible, and picking is not represented by a checkbox.
+Default mode sorts unpicked products newest first using the ordering timestamp and stable ID tie-breaker. Picked products appear visually muted and sort by their most recent pick event, newest first, with stable ID tie-breaking. Restoring a product updates its unpicked ordering timestamp so it moves to the top of the unpicked section. Name mode uses locale-aware alphabetical ordering within each top-level section. Category mode uses the fixed category taxonomy, omits empty groups, displays localized subgroup headings, and sorts products by locale-aware name within each group.
+
+Search relevance overrides the selected sorting mode while the query is non-empty. Clearing search resumes the persisted mode. Local and remote changes use the same restrained transition language when rows move between sections. Neither section is collapsible, and picking is not represented by a checkbox.
 
 ## 8. Search, filtering, and creation
 

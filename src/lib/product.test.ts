@@ -90,6 +90,7 @@ describe('product section ordering', () => {
     {
       id: 'unpicked-fuzzy',
       name: 'Mlik',
+      category: 'dairy_eggs' as const,
       is_picked: false,
       ordering_at: '2026-07-14T00:00:00Z',
       picked_at: null
@@ -97,6 +98,7 @@ describe('product section ordering', () => {
     {
       id: 'unpicked-prefix',
       name: 'Milk chocolate',
+      category: 'dairy_eggs' as const,
       is_picked: false,
       ordering_at: '2026-07-13T00:00:00Z',
       picked_at: null
@@ -104,6 +106,7 @@ describe('product section ordering', () => {
     {
       id: 'picked-fuzzy',
       name: 'Mlik',
+      category: 'dairy_eggs' as const,
       is_picked: true,
       ordering_at: '2026-07-14T00:00:00Z',
       picked_at: '2026-07-14T00:00:00Z'
@@ -111,6 +114,7 @@ describe('product section ordering', () => {
     {
       id: 'picked-prefix',
       name: 'Milk chocolate',
+      category: 'dairy_eggs' as const,
       is_picked: true,
       ordering_at: '2026-07-13T00:00:00Z',
       picked_at: '2026-07-13T00:00:00Z'
@@ -118,7 +122,7 @@ describe('product section ordering', () => {
   ]
 
   it('preserves relevance order within separate picked states while searching', () => {
-    const sections = orderProductSections(products, 'milk')
+    const sections = orderProductSections(products, 'milk', 'category', 'en')
     expect(sections.unpicked.map(({ id }) => id)).toEqual(['unpicked-prefix', 'unpicked-fuzzy'])
     expect(sections.picked.map(({ id }) => id)).toEqual(['picked-prefix', 'picked-fuzzy'])
   })
@@ -127,6 +131,58 @@ describe('product section ordering', () => {
     const sections = orderProductSections(products, '')
     expect(sections.unpicked.map(({ id }) => id)).toEqual(['unpicked-fuzzy', 'unpicked-prefix'])
     expect(sections.picked.map(({ id }) => id)).toEqual(['picked-fuzzy', 'picked-prefix'])
+  })
+
+  it('uses locale-aware name ordering within separate picked states', () => {
+    const sections = orderProductSections(
+      [
+        { ...products[0]!, id: 'zebra', name: 'Zebra' },
+        { ...products[1]!, id: 'apple', name: 'apple' },
+        { ...products[2]!, id: 'picked-zebra', name: 'Zebra' },
+        { ...products[3]!, id: 'picked-apple', name: 'apple' }
+      ],
+      '',
+      'name',
+      'en'
+    )
+
+    expect(sections.unpicked.map(({ id }) => id)).toEqual(['apple', 'zebra'])
+    expect(sections.picked.map(({ id }) => id)).toEqual(['picked-apple', 'picked-zebra'])
+  })
+
+  it('uses the active locale for name ordering', () => {
+    const sections = orderProductSections(
+      [
+        { ...products[0]!, id: 'olives', name: 'זיתים' },
+        { ...products[1]!, id: 'avocado', name: 'אבוקדו' }
+      ],
+      '',
+      'name',
+      'he'
+    )
+
+    expect(sections.unpicked.map(({ id }) => id)).toEqual(['avocado', 'olives'])
+  })
+
+  it('orders categories by the fixed taxonomy and products by localized name', () => {
+    const sections = orderProductSections(
+      [
+        { ...products[0]!, id: 'snacks-zebra', name: 'Zebra', category: 'snacks' as const },
+        { ...products[0]!, id: 'dairy-milk', name: 'Milk', category: 'dairy_eggs' as const },
+        { ...products[1]!, id: 'snacks-apple', name: 'apple', category: 'snacks' as const },
+        { ...products[1]!, id: 'bakery-bread', name: 'Bread', category: 'bakery' as const }
+      ],
+      '',
+      'category',
+      'en'
+    )
+
+    expect(sections.unpicked.map(({ id }) => id)).toEqual([
+      'dairy-milk',
+      'bakery-bread',
+      'snacks-apple',
+      'snacks-zebra'
+    ])
   })
 })
 

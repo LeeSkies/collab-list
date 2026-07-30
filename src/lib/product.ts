@@ -1,3 +1,5 @@
+import { PRODUCT_CATEGORIES, type ProductCategory } from './product-category'
+
 export const PRODUCT_NAME_MAX = 80
 export const PRODUCT_NOTES_MAX = 500
 export const QUANTITY_MIN = 1
@@ -96,22 +98,43 @@ export function searchProducts<T extends SearchableProduct>(
     )
 }
 
+export type ProductSortMode = 'default' | 'name' | 'category'
+
 export interface SectionableProduct extends SearchableProduct {
+  category: ProductCategory
   is_picked: boolean
   ordering_at: string
   picked_at: string | null
 }
 
-export function orderProductSections<T extends SectionableProduct>(products: T[], query: string) {
+export function orderProductSections<T extends SectionableProduct>(
+  products: T[],
+  query: string,
+  sortMode: ProductSortMode = 'default',
+  locale = 'en'
+) {
   const filtered = searchProducts(products, query).map(({ product }) => product)
   const unpicked = filtered.filter((product) => !product.is_picked)
   const picked = filtered.filter((product) => product.is_picked)
 
   if (!normalizeText(query)) {
-    unpicked.sort((a, b) => b.ordering_at.localeCompare(a.ordering_at) || a.id.localeCompare(b.id))
-    picked.sort(
-      (a, b) => (b.picked_at ?? '').localeCompare(a.picked_at ?? '') || a.id.localeCompare(b.id)
-    )
+    if (sortMode === 'name' || sortMode === 'category') {
+      const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true })
+      const byName = (a: T, b: T) => collator.compare(a.name, b.name) || a.id.localeCompare(b.id)
+      const categoryOrder = new Map(PRODUCT_CATEGORIES.map((category, index) => [category, index]))
+      const byCategory = (a: T, b: T) =>
+        categoryOrder.get(a.category)! - categoryOrder.get(b.category)! || byName(a, b)
+      const compare = sortMode === 'category' ? byCategory : byName
+      unpicked.sort(compare)
+      picked.sort(compare)
+    } else {
+      unpicked.sort(
+        (a, b) => b.ordering_at.localeCompare(a.ordering_at) || a.id.localeCompare(b.id)
+      )
+      picked.sort(
+        (a, b) => (b.picked_at ?? '').localeCompare(a.picked_at ?? '') || a.id.localeCompare(b.id)
+      )
+    }
   }
 
   return { unpicked, picked }

@@ -1,5 +1,6 @@
 import {
   ArrowCounterClockwise,
+  ArrowsDownUp,
   Globe,
   MagnifyingGlass,
   Plus,
@@ -19,7 +20,8 @@ import {
   duplicateSignature,
   normalizeNameForStorage,
   normalizeText,
-  orderProductSections
+  orderProductSections,
+  type ProductSortMode
 } from '../lib/product'
 import {
   ProductMutationCoordinator,
@@ -33,11 +35,18 @@ import { ProductDrawer } from './product-drawer'
 import { ProductSection } from './product-section'
 import { RestoreAllDialog } from './restore-all-dialog'
 
+const SORT_MODES: ProductSortMode[] = ['default', 'name', 'category']
+const SORT_STORAGE_KEY = 'grocery-sort-mode'
+
 export function GroceryApp() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const auth = useAuth()
   const client = useQueryClient()
   const [search, setSearch] = useState('')
+  const [sortMode, setSortMode] = useState<ProductSortMode>(() => {
+    const stored = localStorage.getItem(SORT_STORAGE_KEY)
+    return SORT_MODES.find((mode) => mode === stored) ?? 'default'
+  })
   const [selected, setSelected] = useState<Product | null>(null)
   const [adminOpen, setAdminOpen] = useState(false)
   const [restoreAllOpen, setRestoreAllOpen] = useState(false)
@@ -121,7 +130,10 @@ export function GroceryApp() {
   const selectedProduct = selected
     ? (list.find((product) => product.id === selected.id) ?? selected)
     : null
-  const { unpicked, picked } = useMemo(() => orderProductSections(list, search), [list, search])
+  const { unpicked, picked } = useMemo(
+    () => orderProductSections(list, search, sortMode, i18n.resolvedLanguage ?? i18n.language),
+    [i18n.language, i18n.resolvedLanguage, list, search, sortMode]
+  )
   const signature = duplicateSignature(search)
   const duplicate = signature
     ? list.find((product) => product.name_signature === signature)
@@ -423,6 +435,19 @@ export function GroceryApp() {
               </button>
             </div>
           </div>
+          <button
+            type="button"
+            className="sort-button"
+            aria-label={t('sortMode', { mode: t(`sort_${sortMode}`) })}
+            onClick={() => {
+              const next = SORT_MODES[(SORT_MODES.indexOf(sortMode) + 1) % SORT_MODES.length]!
+              localStorage.setItem(SORT_STORAGE_KEY, next)
+              setSortMode(next)
+            }}
+          >
+            <ArrowsDownUp weight="bold" />
+            <span>{t('sortMode', { mode: t(`sort_${sortMode}`) })}</span>
+          </button>
           {connectionWarningEligible && showConnectionWarning && (
             <button
               className="connection-banner"
@@ -445,6 +470,7 @@ export function GroceryApp() {
               <ProductSection
                 title={t('unpicked')}
                 products={unpicked}
+                groupByCategory={sortMode === 'category' && !normalizeText(search)}
                 duplicatePulse={duplicatePulse}
                 enteringProductIds={enteringProductIds}
                 onEntranceComplete={completeEntrance}
@@ -457,6 +483,7 @@ export function GroceryApp() {
               <ProductSection
                 title={t('picked')}
                 products={picked}
+                groupByCategory={sortMode === 'category' && !normalizeText(search)}
                 showCount={false}
                 headerAction={
                   <button

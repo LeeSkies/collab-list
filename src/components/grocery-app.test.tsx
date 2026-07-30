@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -63,9 +63,147 @@ function buildProductSection(
   )
 }
 
-afterEach(() => {
+afterEach(async () => {
+  localStorage.removeItem('grocery-sort-mode')
+  await i18n.changeLanguage('en')
   vi.restoreAllMocks()
   vi.useRealTimers()
+})
+
+describe('GroceryApp sorting', () => {
+  it('cycles through visible sort modes and restores the persisted mode', async () => {
+    const user = userEvent.setup()
+    await i18n.changeLanguage('en')
+    vi.spyOn(api.products, 'list').mockResolvedValue([newProduct, boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    const view = render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    const sort = await screen.findByRole('button', { name: 'Sort: Default' })
+    expect(sort).toHaveTextContent('Default')
+
+    await user.click(sort)
+    expect(screen.getByRole('button', { name: 'Sort: Name' })).toHaveTextContent('Name')
+    expect(localStorage.getItem('grocery-sort-mode')).toBe('name')
+
+    view.unmount()
+    const nextClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={nextClient}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    const restored = await screen.findByRole('button', { name: 'Sort: Name' })
+    await user.click(restored)
+    expect(screen.getByRole('button', { name: 'Sort: Category' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Sort: Category' }))
+    expect(screen.getByRole('button', { name: 'Sort: Default' })).toBeVisible()
+  })
+
+  it('shows only populated category groups and sorts names within each top-level section', async () => {
+    await i18n.changeLanguage('en')
+    localStorage.setItem('grocery-sort-mode', 'category')
+    const products: Product[] = [
+      { ...newProduct, id: 'snacks-zebra', name: 'Zebra', category: 'snacks' },
+      { ...newProduct, id: 'dairy-milk', name: 'Milk', category: 'dairy_eggs' },
+      { ...newProduct, id: 'snacks-apple', name: 'apple', category: 'snacks' },
+      { ...boughtProduct, id: 'bakery-bread', name: 'Bread', category: 'bakery' }
+    ]
+    vi.spyOn(api.products, 'list').mockResolvedValue(products)
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    const toBuy = (await screen.findByRole('heading', { name: /To buy/ })).closest('section')!
+    const bought = screen.getByRole('heading', { name: 'Bought' }).closest('section')!
+    expect(within(toBuy).getByRole('heading', { name: 'Dairy & eggs' })).toBeVisible()
+    expect(within(toBuy).getByRole('heading', { name: 'Snacks' })).toBeVisible()
+    expect(within(bought).getByRole('heading', { name: 'Bakery' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'Pantry' })).not.toBeInTheDocument()
+    expect(
+      within(toBuy)
+        .getAllByRole('button', { name: /^Edit / })
+        .map((button) => button.getAttribute('aria-label'))
+    ).toEqual(['Edit Milk', 'Edit apple', 'Edit Zebra'])
+  })
+
+  it('gives search relevance precedence and restores category sorting when cleared', async () => {
+    const user = userEvent.setup()
+    await i18n.changeLanguage('en')
+    localStorage.setItem('grocery-sort-mode', 'category')
+    const products: Product[] = [
+      { ...newProduct, id: 'prefix', name: 'Milk chocolate', category: 'snacks' },
+      { ...newProduct, id: 'contains', name: 'Buttermilk', category: 'dairy_eggs' },
+      { ...newProduct, id: 'fuzzy', name: 'Mlik', category: 'bakery' }
+    ]
+    vi.spyOn(api.products, 'list').mockResolvedValue(products)
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    const toBuy = (await screen.findByRole('heading', { name: /To buy/ })).closest('section')!
+    await user.type(screen.getByRole('textbox', { name: 'Find or add a product' }), 'milk')
+    expect(
+      within(toBuy)
+        .getAllByRole('button', { name: /^Edit / })
+        .map((button) => button.getAttribute('aria-label'))
+    ).toEqual(['Edit Milk chocolate', 'Edit Buttermilk', 'Edit Mlik'])
+    expect(within(toBuy).queryByRole('heading', { name: 'Snacks' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(within(toBuy).getByRole('heading', { name: 'Dairy & eggs' })).toBeVisible()
+    expect(
+      within(toBuy)
+        .getAllByRole('button', { name: /^Edit / })
+        .map((button) => button.getAttribute('aria-label'))
+    ).toEqual(['Edit Buttermilk', 'Edit Mlik', 'Edit Milk chocolate'])
+  })
+
+  it('localizes category sorting for Hebrew RTL', async () => {
+    await i18n.changeLanguage('he')
+    localStorage.setItem('grocery-sort-mode', 'category')
+    vi.spyOn(api.products, 'list').mockResolvedValue([
+      { ...newProduct, id: 'hebrew-snack', name: 'חטיף', category: 'snacks' }
+    ])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByRole('button', { name: 'מיון: קטגוריה' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'חטיפים' })).toBeVisible()
+    expect(document.documentElement).toHaveAttribute('dir', 'rtl')
+  })
 })
 
 describe('GroceryApp realtime categories', () => {

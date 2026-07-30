@@ -1,5 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+import { PRODUCT_CATEGORIES } from '../lib/product-category'
 import type { Product } from '../lib/types'
 import { ProductRow } from './product-row'
 
@@ -15,7 +17,8 @@ export function ProductSection({
   onAdjust,
   onToggle,
   showCount = true,
-  headerAction
+  headerAction,
+  groupByCategory = false
 }: {
   title: string
   products: Product[]
@@ -29,7 +32,17 @@ export function ProductSection({
   onToggle(product: Product): void
   showCount?: boolean
   headerAction?: ReactNode
+  groupByCategory?: boolean
 }) {
+  const { t } = useTranslation()
+  const groups = groupByCategory
+    ? PRODUCT_CATEGORIES.map((category) => ({
+        key: category,
+        label: t(`category_${category}`),
+        products: products.filter((product) => product.category === category)
+      })).filter((group) => group.products.length > 0)
+    : [{ key: 'all', label: '', products }]
+
   return (
     <section className="product-section">
       {title && (
@@ -39,23 +52,28 @@ export function ProductSection({
           {headerAction}
         </h2>
       )}
-      <motion.ul layout>
-        <AnimatePresence initial={false} mode="popLayout">
-          {products.map((product) => (
-            <ProductRow
-              key={product.id}
-              product={product}
-              duplicatePulse={duplicatePulse === product.id}
-              animateEntrance={enteringProductIds?.has(product.id)}
-              onEntranceComplete={() => onEntranceComplete?.(product.id)}
-              busy={bulkBusy || busyProductIds?.has(product.id)}
-              onEdit={() => onEdit(product)}
-              onAdjust={(delta) => onAdjust(product, delta)}
-              onToggle={() => onToggle(product)}
-            />
-          ))}
-        </AnimatePresence>
-      </motion.ul>
+      {groups.map((group) => (
+        <div className="category-group" key={group.key}>
+          {group.label && <h3>{group.label}</h3>}
+          <motion.ul layout>
+            <AnimatePresence initial={false} mode="popLayout">
+              {group.products.map((product) => (
+                <ProductRow
+                  key={product.id}
+                  product={product}
+                  duplicatePulse={duplicatePulse === product.id}
+                  animateEntrance={enteringProductIds?.has(product.id)}
+                  onEntranceComplete={() => onEntranceComplete?.(product.id)}
+                  busy={bulkBusy || busyProductIds?.has(product.id)}
+                  onEdit={() => onEdit(product)}
+                  onAdjust={(delta) => onAdjust(product, delta)}
+                  onToggle={() => onToggle(product)}
+                />
+              ))}
+            </AnimatePresence>
+          </motion.ul>
+        </div>
+      ))}
     </section>
   )
 }

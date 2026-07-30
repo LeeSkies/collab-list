@@ -355,6 +355,10 @@ body::before {
   background: color-mix(in oklab, var(--card), transparent 4%);
   box-shadow: var(--shadow);
 }
+.list-toolbar {
+  display: grid;
+  gap: 8px;
+}
 .product-scroll {
   min-height: 0;
   margin-inline: -4px;
@@ -380,6 +384,29 @@ body::before {
 .search-shell > svg {
   width: 20px;
   color: var(--muted-foreground);
+}
+.sort-button {
+  display: flex;
+  width: fit-content;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  margin-inline-start: 4px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background: color-mix(in oklab, var(--card), transparent 12%);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 750;
+}
+.sort-button:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+.sort-button svg {
+  width: 15px;
+  height: 15px;
 }
 .search-shell input {
   width: 100%;
@@ -492,6 +519,15 @@ body::before {
 }
 .product-section h2 .restore-all-button:disabled {
   opacity: 0.3;
+}
+.category-group + .category-group {
+  margin-top: 16px;
+}
+.category-group h3 {
+  margin: 0 10px 7px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 750;
 }
 .product-section ul {
   display: grid;
