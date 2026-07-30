@@ -108,13 +108,15 @@ The main input filters current product rows in place; there is no separate resul
 
 For search only, normalize query and candidate strings by applying Unicode `NFKC`, Unicode-aware lowercase conversion, replacing each run of non-letter/non-number characters with one space, trimming, and collapsing internal whitespace. Count Unicode code points rather than UTF-16 code units.
 
-For a normalized one-code-point query, include a product when any normalized candidate token starts with or contains that code point. Order prefix matches before containment-only matches, then by normalized name in ascending Unicode code-point order, then by product ID.
+For every non-empty normalized query, first apply literal matching. A product is a prefix match when any normalized candidate token starts with the full normalized query. It is a containment-only match when the full normalized candidate name contains the query but no token starts with it. Literal matches are always included, including for short partial queries.
 
-For a query of two or more code points, use normalized Damerau–Levenshtein similarity:
+For a query of two or more code points that is not a literal match, also use normalized Damerau–Levenshtein similarity:
 
 `similarity(a, b) = 1 - distance(a, b) / max(codePointLength(a), codePointLength(b))`
 
-where adjacent transposition costs `1`, as do insertion, deletion, and substitution. Score a product as the maximum similarity between the full normalized query and (a) the full normalized product name and (b) each contiguous sequence of product-name tokens. Include only scores greater than or equal to `0.72`. Sort by descending score, then normalized name in ascending Unicode code-point order, then product ID. These normalization, scoring, threshold, and tie-break rules are fixed and shared by implementation and fixtures; “high confidence” is not left to subjective tuning.
+where adjacent transposition costs `1`, as do insertion, deletion, and substitution. Score a fuzzy-only product as the maximum similarity between the full normalized query and (a) the full normalized product name and (b) each contiguous sequence of product-name tokens. Include fuzzy-only scores greater than or equal to `0.72`.
+
+Sort prefix matches first, containment-only matches second, and fuzzy-only matches third. Within the two literal tiers, sort by normalized name in ascending Unicode code-point order and then by product ID. Sort fuzzy-only matches by descending similarity, then normalized name, then product ID. Preserve this relevance order within the unpicked and picked sections while search is active; when search is empty, use the normal chronological section ordering. These normalization, scoring, threshold, and tie-break rules are fixed and shared by implementation and fixtures; “high confidence” is not left to subjective tuning.
 
 A filtered row remains a normal product row. Tapping it opens that product's edit drawer and never adds another entity.
 

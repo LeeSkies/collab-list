@@ -71,17 +71,15 @@ export function searchProducts<T extends SearchableProduct>(
 ): ScoredProduct<T>[] {
   const normalizedQuery = normalizeText(query)
   if (!normalizedQuery) return products.map((product) => ({ product, score: 1 }))
-  const queryLength = [...normalizedQuery].length
-
   return products
     .map((product) => {
       const candidate = normalizeText(product.name)
       const tokens = candidate.split(' ')
-      if (queryLength === 1) {
-        const prefix = tokens.some((token) => token.startsWith(normalizedQuery))
-        const contains = tokens.some((token) => token.includes(normalizedQuery))
-        return { product, score: prefix ? 1 : contains ? 0.9 : 0 }
-      }
+      const prefix = tokens.some((token) => token.startsWith(normalizedQuery))
+      const contains = candidate.includes(normalizedQuery)
+      if (prefix || contains) return { product, score: prefix ? 3 : 2 }
+      if ([...normalizedQuery].length < 2) return { product, score: 0 }
+
       const sequences = contiguousSequences(tokens)
       const score = Math.max(
         similarity(normalizedQuery, candidate),
@@ -96,6 +94,27 @@ export function searchProducts<T extends SearchableProduct>(
         codePointCompare(normalizeText(a.product.name), normalizeText(b.product.name)) ||
         codePointCompare(a.product.id, b.product.id)
     )
+}
+
+export interface SectionableProduct extends SearchableProduct {
+  is_picked: boolean
+  ordering_at: string
+  picked_at: string | null
+}
+
+export function orderProductSections<T extends SectionableProduct>(products: T[], query: string) {
+  const filtered = searchProducts(products, query).map(({ product }) => product)
+  const unpicked = filtered.filter((product) => !product.is_picked)
+  const picked = filtered.filter((product) => product.is_picked)
+
+  if (!normalizeText(query)) {
+    unpicked.sort((a, b) => b.ordering_at.localeCompare(a.ordering_at) || a.id.localeCompare(b.id))
+    picked.sort(
+      (a, b) => (b.picked_at ?? '').localeCompare(a.picked_at ?? '') || a.id.localeCompare(b.id)
+    )
+  }
+
+  return { unpicked, picked }
 }
 
 function contiguousSequences(tokens: string[]): string[] {

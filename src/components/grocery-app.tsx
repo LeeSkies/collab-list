@@ -19,7 +19,7 @@ import {
   duplicateSignature,
   normalizeNameForStorage,
   normalizeText,
-  searchProducts
+  orderProductSections
 } from '../lib/product'
 import {
   ProductMutationCoordinator,
@@ -117,16 +117,7 @@ export function GroceryApp() {
   }, [connectionWarningEligible])
 
   const list = useMemo(() => products.data ?? [], [products.data])
-  const scored = useMemo(() => searchProducts(list, search), [list, search])
-  const filtered = scored.map(({ product }) => product)
-  const unpicked = filtered
-    .filter((product) => !product.is_picked)
-    .sort((a, b) => b.ordering_at.localeCompare(a.ordering_at) || a.id.localeCompare(b.id))
-  const picked = filtered
-    .filter((product) => product.is_picked)
-    .sort(
-      (a, b) => (b.picked_at ?? '').localeCompare(a.picked_at ?? '') || a.id.localeCompare(b.id)
-    )
+  const { unpicked, picked } = useMemo(() => orderProductSections(list, search), [list, search])
   const signature = duplicateSignature(search)
   const duplicate = signature
     ? list.find((product) => product.name_signature === signature)
@@ -482,7 +473,9 @@ export function GroceryApp() {
                 onToggle={toggleProduct}
               />
               {list.length === 0 && <p className="empty-state">{t('empty')}</p>}
-              {search && filtered.length === 0 && <p className="empty-state">{t('noMatches')}</p>}
+              {search && unpicked.length + picked.length === 0 && (
+                <p className="empty-state">{t('noMatches')}</p>
+              )}
             </LayoutGroup>
           )}
         </div>
