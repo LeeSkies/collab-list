@@ -10,6 +10,7 @@ interface ProductRowProps {
   product: Product
   duplicatePulse: boolean
   animateEntrance?: boolean
+  animateChanges?: boolean
   onEntranceComplete?(): void
   busy?: boolean
   onEdit(): void
@@ -22,6 +23,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
     product,
     duplicatePulse,
     animateEntrance = false,
+    animateChanges = true,
     onEntranceComplete,
     busy = false,
     onEdit,
@@ -52,13 +54,13 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
   return (
     <motion.li
       ref={ref}
-      layout={!reduced && canReflow ? 'position' : false}
-      layoutId={`product-${product.id}`}
+      layout={animateChanges && !reduced && canReflow ? 'position' : false}
+      layoutId={animateChanges ? `product-${product.id}` : undefined}
       data-product-id={product.id}
       className={`product-wrap ${duplicatePulse ? 'duplicate-pulse' : ''}`}
       initial={animateEntrance ? (reduced ? { opacity: 0 } : { opacity: 0, scale: 0.9 }) : false}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0 }}
+      exit={animateChanges ? { opacity: 0 } : undefined}
       transition={{ type: 'spring', duration: 0.24, bounce: 0 }}
       onAnimationComplete={animateEntrance ? onEntranceComplete : undefined}
     >

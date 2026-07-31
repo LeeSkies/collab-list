@@ -473,6 +473,7 @@ export function GroceryApp() {
                 title={t('unpicked')}
                 products={unpicked}
                 groupByCategory={sortMode === 'category' && !normalizeText(search)}
+                animateChanges={!categoryFilterOpen}
                 headerAction={
                   <div className="list-header-actions">
                     <SortMenu
@@ -506,6 +507,7 @@ export function GroceryApp() {
                 title={t('picked')}
                 products={picked}
                 groupByCategory={sortMode === 'category' && !normalizeText(search)}
+                animateChanges={!categoryFilterOpen}
                 showCount={false}
                 headerAction={
                   <button

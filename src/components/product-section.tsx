@@ -18,7 +18,8 @@ export function ProductSection({
   onToggle,
   showCount = true,
   headerAction,
-  groupByCategory = false
+  groupByCategory = false,
+  animateChanges = true
 }: {
   title: string
   products: Product[]
@@ -33,6 +34,7 @@ export function ProductSection({
   showCount?: boolean
   headerAction?: ReactNode
   groupByCategory?: boolean
+  animateChanges?: boolean
 }) {
   const { t } = useTranslation()
   const groups = groupByCategory
@@ -55,14 +57,15 @@ export function ProductSection({
       {groups.map((group) => (
         <div className="category-group" key={group.key}>
           {group.label && <h3>{group.label}</h3>}
-          <motion.ul layout>
-            <AnimatePresence initial={false} mode="popLayout">
+          <motion.ul layout={animateChanges}>
+            <AnimatePresence initial={false} mode={animateChanges ? 'popLayout' : 'sync'}>
               {group.products.map((product) => (
                 <ProductRow
                   key={product.id}
                   product={product}
                   duplicatePulse={duplicatePulse === product.id}
                   animateEntrance={enteringProductIds?.has(product.id)}
+                  animateChanges={animateChanges}
                   onEntranceComplete={() => onEntranceComplete?.(product.id)}
                   busy={bulkBusy || busyProductIds?.has(product.id)}
                   onEdit={() => onEdit(product)}

@@ -821,8 +821,7 @@ body::before {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(23 31 25/0.34);
-  backdrop-filter: blur(3px);
+  background: rgb(23 31 25/0.38);
   opacity: 1;
   transition: opacity 180ms ease-out;
 }
