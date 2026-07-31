@@ -530,7 +530,6 @@ body::before {
   align-items: center;
   gap: 2px;
   margin-inline-start: auto;
-  direction: ltr;
 }
 .list-control-button {
   position: relative;
