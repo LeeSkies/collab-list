@@ -93,6 +93,41 @@ test('creates, filters, edits, changes quantity, and deletes a product', async (
   await expect(page.getByText(name, { exact: true })).toHaveCount(0)
 })
 
+test('drawers animate into view', async ({ page }) => {
+  await login(page)
+
+  await page.getByRole('button', { name: /filter categories|סינון קטגוריות/i }).click()
+  const filterDrawer = page.locator('.drawer-popup')
+  expect(
+    await filterDrawer.evaluate((drawer) => new DOMMatrix(getComputedStyle(drawer).transform).m42)
+  ).toBeGreaterThan(0)
+  await expect
+    .poll(() =>
+      filterDrawer.evaluate((drawer) =>
+        Math.round(new DOMMatrix(getComputedStyle(drawer).transform).m42)
+      )
+    )
+    .toBe(0)
+  await page.getByRole('button', { name: /^close$|^סגירה$/i }).click()
+  await expect(filterDrawer).toHaveCount(0)
+
+  await page
+    .getByRole('button', { name: /^edit |^עריכת /i })
+    .first()
+    .click()
+  const productDrawer = page.locator('.drawer-popup')
+  expect(
+    await productDrawer.evaluate((drawer) => new DOMMatrix(getComputedStyle(drawer).transform).m42)
+  ).toBeGreaterThan(0)
+  await expect
+    .poll(() =>
+      productDrawer.evaluate((drawer) =>
+        Math.round(new DOMMatrix(getComputedStyle(drawer).transform).m42)
+      )
+    )
+    .toBe(0)
+})
+
 test('switches direction and persists language', async ({ page }) => {
   await login(page)
   const before = await page.locator('html').getAttribute('dir')

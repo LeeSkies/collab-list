@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { api, ApiError } from '../lib/api'
+import { PRODUCT_CATEGORIES } from '../lib/product-category'
 import type { Product } from '../lib/types'
 import { GroceryApp } from './grocery-app'
 import { ProductSection } from './product-section'
@@ -71,7 +72,7 @@ afterEach(async () => {
 })
 
 describe('GroceryApp sorting', () => {
-  it('cycles through visible sort modes and restores the persisted mode', async () => {
+  it('selects a sort mode from a compact menu and restores the persisted mode', async () => {
     const user = userEvent.setup()
     await i18n.changeLanguage('en')
     vi.spyOn(api.products, 'list').mockResolvedValue([newProduct, boughtProduct])
@@ -87,10 +88,12 @@ describe('GroceryApp sorting', () => {
     )
 
     const sort = await screen.findByRole('button', { name: 'Sort: Default' })
-    expect(sort).toHaveTextContent('Default')
+    expect(sort).not.toHaveTextContent('Default')
+    expect(sort).not.toHaveClass('is-active')
 
-    await user.click(sort)
-    expect(screen.getByRole('button', { name: 'Sort: Name' })).toHaveTextContent('Name')
+    fireEvent.mouseDown(sort)
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Name' }))
+    expect(screen.getByRole('button', { name: 'Sort: Name' })).toHaveClass('is-active')
     expect(localStorage.getItem('grocery-sort-mode')).toBe('name')
 
     view.unmount()
@@ -104,10 +107,13 @@ describe('GroceryApp sorting', () => {
     )
 
     const restored = await screen.findByRole('button', { name: 'Sort: Name' })
-    await user.click(restored)
+    fireEvent.mouseDown(restored)
+    expect(await screen.findByRole('menuitemradio', { name: 'Name' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    await user.click(screen.getByRole('menuitemradio', { name: 'Category' }))
     expect(screen.getByRole('button', { name: 'Sort: Category' })).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Sort: Category' }))
-    expect(screen.getByRole('button', { name: 'Sort: Default' })).toBeVisible()
   })
 
   it('shows only populated category groups and sorts names within each top-level section', async () => {
@@ -203,6 +209,101 @@ describe('GroceryApp sorting', () => {
     expect(await screen.findByRole('button', { name: 'מיון: קטגוריה' })).toBeVisible()
     expect(await screen.findByRole('heading', { name: 'חטיפים' })).toBeVisible()
     expect(document.documentElement).toHaveAttribute('dir', 'rtl')
+  })
+})
+
+describe('GroceryApp category filtering', () => {
+  it('filters both list sections from the category drawer and can show all categories again', async () => {
+    const user = userEvent.setup()
+    await i18n.changeLanguage('en')
+    const products: Product[] = [
+      { ...newProduct, id: 'snack-to-buy', name: 'Pretzels', category: 'snacks' },
+      { ...newProduct, id: 'dairy-to-buy', name: 'Yogurt', category: 'dairy_eggs' },
+      { ...boughtProduct, id: 'snack-bought', name: 'Chips', category: 'snacks' },
+      { ...boughtProduct, id: 'bakery-bought', name: 'Rolls', category: 'bakery' }
+    ]
+    vi.spyOn(api.products, 'list').mockResolvedValue(products)
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Edit Pretzels' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Edit Yogurt' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Edit Chips' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Edit Rolls' })).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: 'Filter categories' }))
+    expect(screen.queryByText('Applies to both To buy and Bought.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Apply filters' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show all' })).not.toBeInTheDocument()
+
+    const allCategories = screen.getByRole('button', { name: 'All categories' })
+    let categoryButtons = PRODUCT_CATEGORIES.map((category) =>
+      screen.getByRole('button', { name: i18n.t(`category_${category}`) })
+    )
+    expect(allCategories).toHaveAttribute('aria-pressed', 'false')
+    categoryButtons.forEach((button) => expect(button).toHaveAttribute('aria-pressed', 'false'))
+    expect(document.querySelector('.filter-button.is-active')).not.toBeInTheDocument()
+
+    await user.click(allCategories)
+    expect(allCategories).toHaveAttribute('aria-pressed', 'true')
+    categoryButtons.forEach((button) => expect(button).toHaveAttribute('aria-pressed', 'true'))
+    expect(document.querySelector('.filter-button.is-active')).not.toBeInTheDocument()
+
+    await user.click(allCategories)
+    expect(allCategories).toHaveAttribute('aria-pressed', 'false')
+    categoryButtons.forEach((button) => expect(button).toHaveAttribute('aria-pressed', 'false'))
+    expect(document.querySelector('.filter-count')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Snacks' }))
+    expect(screen.getByRole('button', { name: 'Snacks' })).toHaveAttribute('aria-pressed', 'true')
+
+    const options = document.querySelector<HTMLElement>('.category-filter-options')!
+    expect(
+      within(options)
+        .getAllByRole('button')
+        .slice(0, 3)
+        .map((button) => button.textContent)
+    ).toEqual(['All categories', 'Snacks', 'Fruit & vegetables'])
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Filter categories' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.getByRole('button', { name: 'Edit Pretzels' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Edit Chips' })).toBeVisible()
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Edit Yogurt' })).not.toBeInTheDocument()
+    )
+    expect(screen.queryByRole('button', { name: 'Edit Rolls' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Filter categories' }))
+    await user.click(screen.getByRole('button', { name: 'All categories' }))
+    categoryButtons = PRODUCT_CATEGORIES.map((category) =>
+      screen.getByRole('button', { name: i18n.t(`category_${category}`) })
+    )
+    categoryButtons.forEach((button) => expect(button).toHaveAttribute('aria-pressed', 'true'))
+
+    await user.click(screen.getByRole('button', { name: 'All categories' }))
+    categoryButtons.forEach((button) => expect(button).toHaveAttribute('aria-pressed', 'false'))
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    expect(screen.getByRole('button', { name: 'Filter categories' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
+    expect(screen.getByRole('button', { name: 'Edit Yogurt' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Edit Rolls' })).toBeVisible()
   })
 })
 

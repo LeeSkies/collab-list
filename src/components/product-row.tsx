@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { quantityCanAdjust } from '../lib/product'
 import type { Product } from '../lib/types'
-import { HoldToRevealName } from './hold-to-reveal-name'
+import { useHoldToReveal } from './hold-to-reveal-name'
 
 interface ProductRowProps {
   product: Product
@@ -39,6 +39,10 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
   const backgroundOpacity = useTransform(progress, [0, 1], [0, 1])
   const [crossed, setCrossed] = useState(false)
   const [canReflow, setCanReflow] = useState(false)
+  const { targetProps: holdTargetProps, reveal: heldDetails } = useHoldToReveal(
+    product.name,
+    product.notes
+  )
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setCanReflow(true))
@@ -62,6 +66,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
         {product.is_picked ? <ArrowCounterClockwise weight="bold" /> : <Check weight="bold" />}
       </motion.div>
       <motion.article
+        {...holdTargetProps}
         className={`product-row ${product.is_picked ? 'is-picked' : ''}`}
         style={{ x, opacity }}
         drag={reduced || busy ? false : 'x'}
@@ -101,7 +106,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
           aria-label={t('edit', { name: product.name })}
         >
           <strong>
-            <HoldToRevealName name={product.name} notes={product.notes} />
+            <span className="hold-name">{product.name}</span>
           </strong>
           {product.notes && <span>{product.notes}</span>}
         </button>
@@ -113,9 +118,14 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
             readOnly
             onClick={onEdit}
             onPointerDown={(event) => event.stopPropagation()}
+            onContextMenu={(event) => event.stopPropagation()}
           />
         ) : (
-          <div className="quantity-controls" onPointerDown={(event) => event.stopPropagation()}>
+          <div
+            className="quantity-controls"
+            onPointerDown={(event) => event.stopPropagation()}
+            onContextMenu={(event) => event.stopPropagation()}
+          >
             <button
               aria-label={t('minus')}
               disabled={busy || !quantityCanAdjust(product.quantity, -1)}
@@ -144,6 +154,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
           {product.is_picked ? t('restore') : t('pick')}
         </button>
       </motion.article>
+      {heldDetails}
     </motion.li>
   )
 })

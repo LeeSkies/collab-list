@@ -1,6 +1,9 @@
+import { Menu } from '@base-ui/react/menu'
 import {
   ArrowCounterClockwise,
   ArrowsDownUp,
+  Check,
+  Funnel,
   Globe,
   MagnifyingGlass,
   Plus,
@@ -28,9 +31,11 @@ import {
   rollbackOptimisticProduct,
   type ProductMutationState
 } from '../lib/product-mutation-coordinator'
+import { PRODUCT_CATEGORIES, type ProductCategory } from '../lib/product-category'
 import type { Product, ProductChanges } from '../lib/types'
 import { TrailingRefresh } from '../lib/trailing-refresh'
 import { AdminDrawer } from './admin-drawer'
+import { CategoryFilterDrawer } from './category-filter-drawer'
 import { ProductDrawer } from './product-drawer'
 import { ProductSection } from './product-section'
 import { RestoreAllDialog } from './restore-all-dialog'
@@ -49,6 +54,8 @@ export function GroceryApp() {
   })
   const [selected, setSelected] = useState<Product | null>(null)
   const [adminOpen, setAdminOpen] = useState(false)
+  const [categoryFilterOpen, setCategoryFilterOpen] = useState(false)
+  const [categoryFilters, setCategoryFilters] = useState<ReadonlySet<ProductCategory>>(new Set())
   const [restoreAllOpen, setRestoreAllOpen] = useState(false)
   const [duplicatePulse, setDuplicatePulse] = useState('')
   const [enteringProductIds, setEnteringProductIds] = useState<ReadonlySet<string>>(new Set())
@@ -130,9 +137,17 @@ export function GroceryApp() {
   const selectedProduct = selected
     ? (list.find((product) => product.id === selected.id) ?? selected)
     : null
+  const categoryFilterActive =
+    categoryFilters.size > 0 && categoryFilters.size < PRODUCT_CATEGORIES.length
+  const filteredList = useMemo(
+    () =>
+      categoryFilterActive ? list.filter((product) => categoryFilters.has(product.category)) : list,
+    [categoryFilterActive, categoryFilters, list]
+  )
   const { unpicked, picked } = useMemo(
-    () => orderProductSections(list, search, sortMode, i18n.resolvedLanguage ?? i18n.language),
-    [i18n.language, i18n.resolvedLanguage, list, search, sortMode]
+    () =>
+      orderProductSections(filteredList, search, sortMode, i18n.resolvedLanguage ?? i18n.language),
+    [filteredList, i18n.language, i18n.resolvedLanguage, search, sortMode]
   )
   const signature = duplicateSignature(search)
   const duplicate = signature
@@ -435,19 +450,6 @@ export function GroceryApp() {
               </button>
             </div>
           </div>
-          <button
-            type="button"
-            className="sort-button"
-            aria-label={t('sortMode', { mode: t(`sort_${sortMode}`) })}
-            onClick={() => {
-              const next = SORT_MODES[(SORT_MODES.indexOf(sortMode) + 1) % SORT_MODES.length]!
-              localStorage.setItem(SORT_STORAGE_KEY, next)
-              setSortMode(next)
-            }}
-          >
-            <ArrowsDownUp weight="bold" />
-            <span>{t('sortMode', { mode: t(`sort_${sortMode}`) })}</span>
-          </button>
           {connectionWarningEligible && showConnectionWarning && (
             <button
               className="connection-banner"
@@ -471,6 +473,26 @@ export function GroceryApp() {
                 title={t('unpicked')}
                 products={unpicked}
                 groupByCategory={sortMode === 'category' && !normalizeText(search)}
+                headerAction={
+                  <div className="list-header-actions">
+                    <SortMenu
+                      mode={sortMode}
+                      onChange={(next) => {
+                        localStorage.setItem(SORT_STORAGE_KEY, next)
+                        setSortMode(next)
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className={`list-control-button filter-button ${categoryFilterActive ? 'is-active' : ''}`}
+                      aria-label={t('filterCategories')}
+                      aria-pressed={categoryFilterActive}
+                      onClick={() => setCategoryFilterOpen(true)}
+                    >
+                      <Funnel weight="bold" />
+                    </button>
+                  </div>
+                }
                 duplicatePulse={duplicatePulse}
                 enteringProductIds={enteringProductIds}
                 onEntranceComplete={completeEntrance}
@@ -509,8 +531,10 @@ export function GroceryApp() {
                 onToggle={toggleProduct}
               />
               {list.length === 0 && <p className="empty-state">{t('empty')}</p>}
-              {search && unpicked.length + picked.length === 0 && (
-                <p className="empty-state">{t('noMatches')}</p>
+              {(search || categoryFilterActive) && unpicked.length + picked.length === 0 && (
+                <p className="empty-state">
+                  {categoryFilterActive ? t('noFilteredProducts') : t('noMatches')}
+                </p>
               )}
             </LayoutGroup>
           )}
@@ -533,6 +557,12 @@ export function GroceryApp() {
       {auth.profile?.role === 'admin' && (
         <AdminDrawer open={adminOpen} onOpenChange={setAdminOpen} />
       )}
+      <CategoryFilterDrawer
+        open={categoryFilterOpen}
+        onOpenChange={setCategoryFilterOpen}
+        selectedCategories={categoryFilters}
+        onChange={setCategoryFilters}
+      />
       <RestoreAllDialog
         key={restoreAllOpen ? 'restore-open' : 'restore-closed'}
         open={restoreAllOpen}
@@ -543,6 +573,42 @@ export function GroceryApp() {
       <AppToast message={toast} />
       <PwaUpdate />
     </main>
+  )
+}
+
+function SortMenu({
+  mode,
+  onChange
+}: {
+  mode: ProductSortMode
+  onChange(mode: ProductSortMode): void
+}) {
+  const { t } = useTranslation()
+  return (
+    <Menu.Root>
+      <Menu.Trigger
+        className={`list-control-button sort-button ${mode !== 'default' ? 'is-active' : ''}`}
+        aria-label={t('sortMode', { mode: t(`sort_${mode}`) })}
+      >
+        <ArrowsDownUp weight="bold" />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner className="sort-menu-positioner" sideOffset={6} align="end">
+          <Menu.Popup className="sort-menu-popup">
+            <Menu.RadioGroup value={mode} onValueChange={(next: ProductSortMode) => onChange(next)}>
+              {SORT_MODES.map((option) => (
+                <Menu.RadioItem key={option} className="sort-menu-item" value={option} closeOnClick>
+                  <span>{t(`sort_${option}`)}</span>
+                  <Menu.RadioItemIndicator className="sort-menu-indicator">
+                    <Check weight="bold" />
+                  </Menu.RadioItemIndicator>
+                </Menu.RadioItem>
+              ))}
+            </Menu.RadioGroup>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
   )
 }
 
