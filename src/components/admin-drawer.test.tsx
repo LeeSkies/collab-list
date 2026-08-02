@@ -7,14 +7,17 @@ import i18n from '../i18n'
 import { api } from '../lib/api'
 import { AdminDrawer } from './admin-drawer'
 
+const authState = vi.hoisted(() => ({
+  user: { id: 'admin-id' },
+  profile: { household_id: 'household-a', role: 'admin' as 'admin' | 'member' }
+}))
+
 vi.mock('../auth', () => ({
-  useAuth: () => ({
-    user: { id: 'admin-id' },
-    profile: { household_id: 'household-a', role: 'admin' }
-  })
+  useAuth: () => authState
 }))
 
 afterEach(() => {
+  authState.profile.role = 'admin'
   vi.restoreAllMocks()
 })
 
@@ -36,7 +39,7 @@ function renderDrawer(
 describe('AdminDrawer', () => {
   it('does not expose the service-role create-user flow', async () => {
     const user = userEvent.setup()
-    vi.spyOn(api.admin, 'list').mockResolvedValue([
+    vi.spyOn(api.household, 'members').mockResolvedValue([
       {
         id: 'member-id',
         name: 'Dana',
@@ -57,9 +60,22 @@ describe('AdminDrawer', () => {
     expect(screen.getByText('dana@example.com')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Create user' })).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Password' })).not.toBeInTheDocument()
-    expect(client.getQueryData(['admin-users'])).toBeUndefined()
+    expect(client.getQueryData(['household-members'])).toBeUndefined()
     await user.click(screen.getByRole('button', { name: 'Generate invite link' }))
     await waitFor(() => expect(invite).toHaveBeenCalledOnce())
+  })
+
+  it('does not render admin controls for a regular member', () => {
+    authState.profile.role = 'member'
+    const members = vi.spyOn(api.household, 'members')
+    const pendingRequests = vi.spyOn(api.household, 'pendingRequests')
+
+    renderDrawer()
+
+    expect(screen.queryByText('Invite a member')).not.toBeInTheDocument()
+    expect(screen.queryByText('Pending requests')).not.toBeInTheDocument()
+    expect(members).not.toHaveBeenCalled()
+    expect(pendingRequests).not.toHaveBeenCalled()
   })
 
   it('does not reuse a member list cached for another household', async () => {
@@ -67,7 +83,7 @@ describe('AdminDrawer', () => {
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
     })
     client.setQueryData(
-      ['admin-users', 'household-b'],
+      ['household-members', 'household-b'],
       [
         {
           id: 'other-member',
@@ -78,7 +94,7 @@ describe('AdminDrawer', () => {
         }
       ]
     )
-    vi.spyOn(api.admin, 'list').mockResolvedValue([
+    vi.spyOn(api.household, 'members').mockResolvedValue([
       {
         id: 'member-id',
         name: 'Dana',
@@ -93,7 +109,7 @@ describe('AdminDrawer', () => {
 
     expect(await screen.findByText('Dana')).toBeVisible()
     expect(screen.queryByText('Other household member')).not.toBeInTheDocument()
-    expect(client.getQueryData(['admin-users'])).toBeUndefined()
-    expect(client.getQueryData(['admin-users', 'household-b'])).toBeDefined()
+    expect(client.getQueryData(['household-members'])).toBeUndefined()
+    expect(client.getQueryData(['household-members', 'household-b'])).toBeDefined()
   })
 })

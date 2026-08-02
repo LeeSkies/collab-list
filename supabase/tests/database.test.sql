@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(121);
+select plan(135);
 
 select has_table('public', 'products', 'products exists');
 select has_table('public', 'households', 'households exist');
@@ -512,6 +512,86 @@ select throws_ok(
   '23505',
   'account_belongs_to_another_household',
   'an account cannot join another household'
+);
+
+-- Admin membership management is scoped to one household and never uses
+-- account-level deletion. Removing a member also revokes the invite that was
+-- active at removal time; pending notifications remain for admin handling.
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+create temp table removal_invite as select * from public.invite_household_member();
+select is(
+  (select count(*) from public.list_household_members((select household_id from public.household_members where user_id = auth.uid()))),
+  4::bigint,
+  'an admin can list all current household members'
+);
+select is(
+  (select email from public.list_household_members((select household_id from public.household_members where user_id = auth.uid())) where user_id = '10000000-0000-0000-0000-000000000002'::uuid),
+  'member@example.com',
+  'member list returns a shaped profile for each member'
+);
+select throws_ok(
+  $$ select * from public.remove_household_member((select household_id from public.household_members where user_id = auth.uid()), auth.uid()) $$,
+  'P0001',
+  'member_self_removal',
+  'an admin cannot remove themself'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000009';
+select throws_ok(
+  $$ select * from public.list_household_members('00000000-0000-0000-0000-000000000000'::uuid) $$,
+  '42501',
+  'admin_required',
+  'a regular member cannot list household members through the admin RPC'
+);
+select throws_ok(
+  $$ select * from public.remove_household_member('00000000-0000-0000-0000-000000000000'::uuid, '10000000-0000-0000-0000-000000000010'::uuid) $$,
+  '42501',
+  'admin_required',
+  'a regular member cannot remove a household member through the admin RPC'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select is(
+  (select user_id from public.remove_household_member(
+    (select household_id from public.household_members where user_id = auth.uid()),
+    '10000000-0000-0000-0000-000000000002'::uuid
+  )),
+  '10000000-0000-0000-0000-000000000002'::uuid,
+  'an admin can remove another member'
+);
+select is(
+  (select count(*) from public.household_members where user_id = '10000000-0000-0000-0000-000000000002'::uuid),
+  0::bigint,
+  'removal deletes only the household membership row'
+);
+select is(
+  (select count(*) from public.list_household_members((select household_id from public.household_members where user_id = auth.uid())) where user_id = '10000000-0000-0000-0000-000000000002'::uuid),
+  0::bigint,
+  'removed members no longer appear in the admin member list'
+);
+set local role postgres;
+select is((select count(*) from auth.users where id = '10000000-0000-0000-0000-000000000002'::uuid), 1::bigint, 'removal leaves the auth user intact');
+select is((select count(*) from public.profiles where id = '10000000-0000-0000-0000-000000000002'::uuid), 1::bigint, 'removal leaves the profile intact');
+select is((select email from public.profiles where id = '10000000-0000-0000-0000-000000000002'::uuid), 'member@example.com', 'removal does not change the login email');
+set local role authenticated;
+select is(
+  (select status from public.household_join_requests where user_id = '10000000-0000-0000-0000-000000000012'::uuid and status = 'pending' limit 1),
+  'pending',
+  'pending request notifications remain until handled'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
+select throws_ok(
+  $$ select * from public.request_household_access((select invite_token from removal_invite)) $$,
+  '22023',
+  'invite_invalid_or_expired',
+  'a removed member cannot reuse the invite active before removal'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+create temp table rotated_after_removal as select * from public.invite_household_member();
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
+select is(
+  (select status from public.request_household_access((select invite_token from rotated_after_removal))),
+  'pending',
+  'a removed member can request again only with a newly rotated invite'
 );
 
 set local role anon;

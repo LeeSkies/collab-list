@@ -42,6 +42,24 @@ type AbortableRequest<T> = PromiseLike<SupabaseResult<T>> & {
   abortSignal?(signal: AbortSignal): PromiseLike<SupabaseResult<T>>
 }
 
+type AdminUserRow = {
+  user_id: string
+  name: string
+  email: string
+  role: AdminUser['role']
+  created_at: string
+}
+
+function toAdminUser(row: AdminUserRow): AdminUser {
+  return {
+    id: row.user_id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    createdAt: row.created_at
+  }
+}
+
 async function unwrap<T>(request: AbortableRequest<T>, externalSignal?: AbortSignal): Promise<T> {
   const controller = new AbortController()
   let timedOut = false
@@ -213,6 +231,20 @@ export const api = {
         expiresAt: request.expires_at
       }))
     },
+    members: async (householdId: string) => {
+      const rows = await unwrap<AdminUserRow[]>(
+        supabase.rpc('list_household_members', { p_household_id: householdId })
+      )
+      return rows.map(toAdminUser)
+    },
+    removeMember: async (householdId: string, userId: string) => {
+      await unwrap<Array<{ user_id: string }>>(
+        supabase.rpc('remove_household_member', {
+          p_household_id: householdId,
+          p_user_id: userId
+        })
+      )
+    },
     approveRequest: async (requestId: string) => {
       const rows = await unwrap<Array<{ request_id: string; status: string }>>(
         supabase.rpc('approve_household_request', { p_request_id: requestId })
@@ -225,18 +257,6 @@ export const api = {
       )
       return rows[0]!
     }
-  },
-  admin: {
-    invoke: async <T>(action: string, body?: Record<string, unknown>) => {
-      const { data, error } = await supabase.functions.invoke('admin-users', {
-        body: { action, ...body }
-      })
-      if (error) throw new ApiError('admin', error.message)
-      if (data?.error) throw new ApiError(data.code ?? 'admin', data.error)
-      return data as T
-    },
-    list: () => api.admin.invoke<{ users: AdminUser[] }>('list').then((value) => value.users),
-    remove: (userId: string) => api.admin.invoke<{ ok: true }>('delete', { userId })
   },
   realtime: {
     subscribe(

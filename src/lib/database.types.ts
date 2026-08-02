@@ -428,6 +428,16 @@ export type Database = {
         Args: { p_household_id: string }
         Returns: boolean
       }
+      list_household_members: {
+        Args: { p_household_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          name: string
+          role: string
+          user_id: string
+        }[]
+      }
       list_pending_household_requests: {
         Args: { p_household_id: string }
         Returns: {
@@ -452,6 +462,12 @@ export type Database = {
         Returns: {
           request_id: string
           status: string
+        }[]
+      }
+      remove_household_member: {
+        Args: { p_household_id: string; p_user_id: string }
+        Returns: {
+          user_id: string
         }[]
       }
       request_household_access: {

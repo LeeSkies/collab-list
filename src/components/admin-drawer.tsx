@@ -23,8 +23,9 @@ export function AdminDrawer({
   const [inviteLink, setInviteLink] = useState('')
   const [copied, setCopied] = useState(false)
   const householdId = auth.profile?.household_id
+  const isAdmin = auth.profile?.role === 'admin'
   const previousHouseholdId = useRef(householdId)
-  const usersQueryKey = ['admin-users', householdId] as const
+  const usersQueryKey = ['household-members', householdId] as const
   useEffect(() => {
     if (previousHouseholdId.current === householdId) return
     setRemoveUser(null)
@@ -33,14 +34,14 @@ export function AdminDrawer({
   }, [householdId])
   const users = useQuery({
     queryKey: usersQueryKey,
-    queryFn: api.admin.list,
-    enabled: open && Boolean(householdId)
+    queryFn: () => api.household.members(householdId!),
+    enabled: open && isAdmin && Boolean(householdId)
   })
   const pendingRequestsKey = ['household-requests', householdId] as const
   const pendingRequests = useQuery({
     queryKey: pendingRequestsKey,
     queryFn: () => api.household.pendingRequests(householdId!),
-    enabled: open && Boolean(householdId)
+    enabled: open && isAdmin && Boolean(householdId)
   })
   const createInvite = useMutation({
     mutationFn: api.household.invite,
@@ -60,10 +61,12 @@ export function AdminDrawer({
     onError: () => setError(t('requestFailed'))
   })
   const remove = useMutation({
-    mutationFn: (id: string) => api.admin.remove(id),
+    mutationFn: (id: string) => api.household.removeMember(householdId!, id),
     onSuccess: () => client.invalidateQueries({ queryKey: usersQueryKey }),
     onError: () => setError(t('requestFailed'))
   })
+
+  if (!isAdmin) return null
 
   return (
     <>
