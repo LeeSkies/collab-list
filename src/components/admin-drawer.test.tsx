@@ -10,7 +10,8 @@ import { AdminDrawer } from './admin-drawer'
 
 const authState = vi.hoisted(() => ({
   user: { id: 'admin-id' },
-  profile: { household_id: 'household-a', role: 'admin' as 'admin' | 'member' }
+  profile: { household_id: 'household-a', role: 'admin' as 'admin' | 'member' },
+  refreshProfile: vi.fn().mockResolvedValue(undefined)
 }))
 
 vi.mock('../auth', () => ({
@@ -61,6 +62,7 @@ function defaultEntitlement(overrides: Partial<HouseholdEntitlement> = {}): Hous
 
 afterEach(() => {
   authState.profile.role = 'admin'
+  authState.refreshProfile.mockReset().mockResolvedValue(undefined)
   vi.restoreAllMocks()
 })
 
@@ -135,6 +137,28 @@ describe('AdminDrawer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset now' }))
     await waitFor(() => expect(reset).toHaveBeenCalledWith(true, false))
+  })
+
+  it('requires fresh confirmation before deleting and removes the product cache', async () => {
+    const user = userEvent.setup()
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    })
+    client.setQueryData(['products', 'household-a'], [{ id: 'stale-product' }])
+    const removeHousehold = vi.spyOn(api.household, 'delete').mockResolvedValue(undefined)
+
+    renderDrawer(client)
+
+    await user.click(await screen.findByRole('button', { name: /^Delete household$/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Delete this household?' })
+    const action = within(dialog).getByRole('button', { name: /^Delete household$/ })
+    expect(action).toBeDisabled()
+    await user.type(within(dialog).getByRole('textbox'), 'DELETE')
+    expect(action).toBeEnabled()
+    await user.click(action)
+
+    await waitFor(() => expect(removeHousehold).toHaveBeenCalledWith(false))
+    expect(client.getQueryData(['products', 'household-a'])).toBeUndefined()
   })
 
   it('does not render admin controls for a regular member', () => {

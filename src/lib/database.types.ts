@@ -73,6 +73,45 @@ export type Database = {
           }
         ]
       }
+      deleted_households: {
+        Row: {
+          deleted_at: string
+          former_admin_id: string
+          household_id: string
+          household_name: string
+          purge_at: string
+        }
+        Insert: {
+          deleted_at?: string
+          former_admin_id: string
+          household_id: string
+          household_name: string
+          purge_at: string
+        }
+        Update: {
+          deleted_at?: string
+          former_admin_id?: string
+          household_id?: string
+          household_name?: string
+          purge_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'deleted_households_former_admin_id_fkey'
+            columns: ['former_admin_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'deleted_households_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: true
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       feature_flags: {
         Row: {
           created_at: string
@@ -141,6 +180,39 @@ export type Database = {
             referencedColumns: ['id']
           }
         ]
+      }
+      household_cancellation_outbox: {
+        Row: {
+          created_at: string
+          household_id: string
+          id: string
+          provider: string | null
+          provider_subscription_id: string | null
+          reason: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          household_id: string
+          id?: string
+          provider?: string | null
+          provider_subscription_id?: string | null
+          reason: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          household_id?: string
+          id?: string
+          provider?: string | null
+          provider_subscription_id?: string | null
+          reason?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       household_entitlements: {
         Row: {
@@ -455,18 +527,24 @@ export type Database = {
       households: {
         Row: {
           created_at: string
+          deleted_at: string | null
+          deletion_expires_at: string | null
           id: string
           name: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
+          deletion_expires_at?: string | null
           id?: string
           name?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
+          deletion_expires_at?: string | null
           id?: string
           name?: string
           updated_at?: string
@@ -713,6 +791,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      current_deleted_household: {
+        Args: never
+        Returns: {
+          deleted_at: string
+          household_id: string
+          household_name: string
+          purge_at: string
+          recoverable: boolean
+        }[]
+      }
       current_household_entitlement: {
         Args: never
         Returns: {
@@ -758,6 +846,7 @@ export type Database = {
           status: string
         }[]
       }
+      delete_household: { Args: { p_purge_now?: boolean }; Returns: boolean }
       delete_product: {
         Args: { p_expected_version: number; p_product_id: string }
         Returns: boolean
@@ -825,6 +914,8 @@ export type Database = {
         }[]
       }
       product_name_signature: { Args: { input: string }; Returns: string }
+      purge_expired_deleted_households: { Args: never; Returns: number }
+      recover_deleted_household: { Args: never; Returns: boolean }
       reject_household_request: {
         Args: { p_request_id: string }
         Returns: {

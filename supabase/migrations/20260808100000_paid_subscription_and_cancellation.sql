@@ -84,7 +84,10 @@ create index subscription_provider_events_household_idx
 create table public.household_billing_actions (
   id uuid primary key default gen_random_uuid(),
   household_id uuid not null references public.households(id) on delete cascade,
-  action text not null check (action in ('subscribe', 'cancel_at_period_end', 'resubscribe', 'add_on_seat')),
+  -- delete_household is a provider-neutral lifecycle intent. It does not
+  -- write subscription truth; a service-side provider integration settles it
+  -- when cancellation is confirmed.
+  action text not null check (action in ('subscribe', 'cancel_at_period_end', 'resubscribe', 'add_on_seat', 'delete_household')),
   status text not null default 'pending' check (status in ('pending', 'applied', 'rejected')),
   detail jsonb not null default '{}'::jsonb,
   requested_by uuid not null references public.profiles(id) on delete restrict,
@@ -204,6 +207,21 @@ begin
     raise exception using errcode = '22023', message = 'invalid_currency';
   end if;
 
+  -- Immediate and expiry purges remove the household before the provider can
+  -- confirm cancellation. Let the service-role sync settle the durable intent
+  -- without attempting to recreate subscription truth for deleted data.
+  if p_status = 'canceled' and not exists (
+    select 1 from public.households where id = p_household_id
+  ) then
+    update public.household_cancellation_outbox
+    set status = 'applied'
+    where household_id = p_household_id
+      and provider is not distinct from p_provider
+      and provider_subscription_id is not distinct from p_provider_subscription_id
+      and status in ('pending', 'processing', 'failed');
+    return;
+  end if;
+
   insert into public.subscription_provider_events(
     household_id, provider, provider_event_id, provider_subscription_id, provider_event_at
   ) values (
@@ -283,6 +301,16 @@ begin
     set status = 'rejected'
     where household_id = p_household_id and status = 'pending'
       and action = 'cancel_at_period_end';
+  end if;
+
+  -- Deletion uses the same narrow provider-neutral seam without allowing an
+  -- authenticated lifecycle RPC to mutate household_subscriptions. The
+  -- service/provider integration settles this intent only on cancellation.
+  if p_status = 'canceled' then
+    update public.household_billing_actions
+    set status = 'applied'
+    where household_id = p_household_id and status = 'pending'
+      and action = 'delete_household';
   end if;
 end
 $$;

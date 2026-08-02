@@ -54,7 +54,20 @@ export interface HouseholdCreation {
 }
 
 export type HouseholdAccessState =
-  'active_trial' | 'paid_active' | 'read_only_grace' | 'unavailable_locked' | 'paid_placeholder'
+  | 'active_trial'
+  | 'paid_active'
+  | 'read_only_grace'
+  | 'unavailable_locked'
+  | 'paid_placeholder'
+  | 'deleted'
+
+export interface DeletedHousehold {
+  household_id: string
+  household_name: string
+  deleted_at: string
+  purge_at: string
+  recoverable: boolean
+}
 
 export interface HouseholdEntitlement {
   household_id: string

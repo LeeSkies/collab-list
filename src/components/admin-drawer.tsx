@@ -16,6 +16,7 @@ import type {
 import { Button } from './ui/button'
 import { AppDrawer, ConfirmDialog } from './drawer'
 import { ResetHouseholdDialog } from './reset-household-dialog'
+import { DeleteHouseholdDialog } from './delete-household-dialog'
 
 type PlanAction = 'subscribe' | 'cancel' | 'resubscribe' | 'none'
 
@@ -131,6 +132,7 @@ export function AdminDrawer({
   const locale = i18n.resolvedLanguage ?? i18n.language
   const [removeUser, setRemoveUser] = useState<AdminUser | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [error, setError] = useState('')
   const [planNotice, setPlanNotice] = useState('')
   const [pendingAction, setPendingAction] = useState<BillingActionType | null>(null)
@@ -245,6 +247,31 @@ export function AdminDrawer({
   const remove = useMutation({
     mutationFn: (id: string) => api.household.removeMember(householdId!, id),
     onSuccess: () => client.invalidateQueries({ queryKey: usersQueryKey }),
+    onError: mutationError
+  })
+  const deleteHousehold = useMutation({
+    mutationFn: (purgeNow: boolean) => api.household.delete(purgeNow),
+    onSuccess: async () => {
+      const deletedHouseholdId = householdId
+      setDeleteOpen(false)
+      if (deletedHouseholdId) {
+        client.removeQueries({ queryKey: ['household-members', deletedHouseholdId], exact: true })
+        client.removeQueries({ queryKey: ['household-requests', deletedHouseholdId], exact: true })
+        client.removeQueries({
+          queryKey: ['household-subscription', deletedHouseholdId],
+          exact: true
+        })
+        client.removeQueries({
+          queryKey: ['household-entitlement', deletedHouseholdId],
+          exact: true
+        })
+        client.removeQueries({ queryKey: ['products', deletedHouseholdId], exact: true })
+      }
+      await auth.refreshProfile()
+      if (auth.user?.id) {
+        await client.invalidateQueries({ queryKey: ['deleted-household', auth.user.id] })
+      }
+    },
     onError: mutationError
   })
   const reset = useMutation({
@@ -462,6 +489,22 @@ export function AdminDrawer({
             {t('resetHousehold')}
           </Button>
         </section>
+        <section className="reset-management">
+          <div className="section-title">
+            <Trash />
+            <strong>{t('deleteHousehold')}</strong>
+          </div>
+          <p>{t('deleteHouseholdDescription')}</p>
+          <Button
+            type="button"
+            size="lg"
+            variant="destructive"
+            onClick={() => setDeleteOpen(true)}
+            disabled={deleteHousehold.isPending}
+          >
+            {t('deleteHousehold')}
+          </Button>
+        </section>
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -493,6 +536,13 @@ export function AdminDrawer({
           ))}
         </div>
       </AppDrawer>
+      <DeleteHouseholdDialog
+        key={deleteOpen ? 'delete-household-open' : 'delete-household-closed'}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        pending={deleteHousehold.isPending}
+        onConfirm={(purgeNow) => deleteHousehold.mutate(purgeNow)}
+      />
       <ResetHouseholdDialog
         open={resetOpen}
         onOpenChange={setResetOpen}

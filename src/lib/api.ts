@@ -4,6 +4,7 @@ import type {
   AdminUser,
   BillingActionResult,
   BillingActionType,
+  DeletedHousehold,
   HouseholdCreation,
   HouseholdEntitlement,
   HouseholdInvite,
@@ -307,6 +308,16 @@ export const api = {
         })
       )
       return rows[0]!
+    },
+    delete: async (purgeNow: boolean) => {
+      await unwrap<boolean>(supabase.rpc('delete_household', { p_purge_now: purgeNow }))
+    },
+    deleted: async () => {
+      const rows = await unwrap<DeletedHousehold[]>(supabase.rpc('current_deleted_household'))
+      return rows[0] ?? null
+    },
+    recover: async () => {
+      await unwrap<boolean>(supabase.rpc('recover_deleted_household'))
     }
   },
   realtime: {
