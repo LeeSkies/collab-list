@@ -87,6 +87,27 @@ afterEach(async () => {
   vi.useRealTimers()
 })
 
+describe('GroceryApp account access', () => {
+  it('opens the account drawer for regular members', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Account' }))
+    expect(screen.getByRole('heading', { name: 'Account' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Send confirmation email' })).toBeVisible()
+  })
+})
+
 describe('GroceryApp sorting', () => {
   it('selects a sort mode from a compact menu and restores the persisted mode', async () => {
     const user = userEvent.setup()

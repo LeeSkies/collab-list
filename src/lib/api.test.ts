@@ -1,14 +1,65 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { channel, from, rpc } = vi.hoisted(() => ({
+const { auth, channel, from, rpc } = vi.hoisted(() => ({
+  auth: { updateUser: vi.fn() },
   channel: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn()
 }))
 
-vi.mock('./supabase', () => ({ supabase: { channel, from, rpc } }))
+vi.mock('./supabase', () => ({ supabase: { auth, channel, from, rpc } }))
 
-import { api, ApiError, isApiErrorCode, isProductConflict } from './api'
+import { AccountEmailError, api, ApiError, isApiErrorCode, isProductConflict } from './api'
+
+describe('account.updateEmail', () => {
+  beforeEach(() => auth.updateUser.mockReset())
+
+  it('starts Supabase Auth confirmation without changing application identity', async () => {
+    auth.updateUser.mockResolvedValue({
+      data: { user: { id: 'user-1', email: 'new@example.com' } },
+      error: null
+    })
+
+    await expect(api.account.updateEmail(' New@Example.com ')).resolves.toEqual({
+      email: 'new@example.com',
+      confirmationRequired: true
+    })
+    expect(auth.updateUser).toHaveBeenCalledWith(
+      { email: 'new@example.com' },
+      expect.objectContaining({ emailRedirectTo: expect.any(String) })
+    )
+  })
+
+  it('maps a duplicate Auth email to a typed error', async () => {
+    auth.updateUser.mockResolvedValue({
+      data: { user: null },
+      error: {
+        code: 'email_exists',
+        message: 'A user with this email address has already been registered',
+        status: 422
+      }
+    })
+
+    await expect(api.account.updateEmail('taken@example.com')).rejects.toEqual(
+      expect.objectContaining({ code: 'duplicate_email' })
+    )
+    await expect(api.account.updateEmail('not-an-email')).rejects.toBeInstanceOf(AccountEmailError)
+  })
+
+  it.each([
+    ['email_address_invalid', 'invalid_email'],
+    ['over_email_send_rate_limit', 'email_rate_limited']
+  ] as const)('maps the Auth %s code to %s', async (code, expected) => {
+    auth.updateUser.mockResolvedValue({
+      data: { user: null },
+      error: { code, message: code }
+    })
+
+    await expect(api.account.updateEmail('new@example.com')).rejects.toEqual(
+      expect.objectContaining({ code: expected })
+    )
+  })
+})
 
 describe('profile.completeProductTour', () => {
   beforeEach(() => rpc.mockReset())

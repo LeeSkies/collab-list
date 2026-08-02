@@ -27,6 +27,50 @@ export class ApiError extends Error {
   }
 }
 
+export type AccountEmailErrorCode =
+  'invalid_email' | 'duplicate_email' | 'email_rate_limited' | 'email_update_failed'
+
+export class AccountEmailError extends ApiError {
+  declare public code: AccountEmailErrorCode
+
+  constructor(code: AccountEmailErrorCode, message: string) {
+    super(code, message)
+  }
+}
+
+export interface AccountEmailUpdateResult {
+  email: string
+  confirmationRequired: true
+}
+
+function accountEmailError(error: { code?: string; message: string; status?: number }) {
+  const message = error.message.toLowerCase()
+  if (
+    error.code === 'email_exists' ||
+    (error.status === 422 &&
+      (message.includes('already been registered') ||
+        message.includes('already registered') ||
+        message.includes('already exists')))
+  ) {
+    return new AccountEmailError('duplicate_email', 'That email is already in use')
+  }
+  if (
+    error.code === 'over_email_send_rate_limit' ||
+    error.status === 429 ||
+    message.includes('rate limit')
+  ) {
+    return new AccountEmailError('email_rate_limited', 'Too many email change requests')
+  }
+  if (
+    error.code === 'email_address_invalid' ||
+    error.status === 400 ||
+    error.code === 'validation_failed'
+  ) {
+    return new AccountEmailError('invalid_email', 'Enter a valid email address')
+  }
+  return new AccountEmailError('email_update_failed', error.message)
+}
+
 export function isProductConflict(reason: unknown): reason is ApiError {
   return reason instanceof ApiError && (reason.code === 'PT409' || reason.code === '40001')
 }
@@ -92,6 +136,27 @@ async function unwrap<T>(request: AbortableRequest<T>, externalSignal?: AbortSig
 }
 
 export const api = {
+  account: {
+    updateEmail: async (email: string): Promise<AccountEmailUpdateResult> => {
+      const normalizedEmail = email.trim().toLowerCase()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        throw new AccountEmailError('invalid_email', 'Enter a valid email address')
+      }
+      const redirectTo =
+        typeof window === 'undefined'
+          ? undefined
+          : new URL(import.meta.env.BASE_URL, window.location.origin).toString()
+      const { data, error } = await supabase.auth.updateUser(
+        { email: normalizedEmail },
+        redirectTo ? { emailRedirectTo: redirectTo } : undefined
+      )
+      if (error) throw accountEmailError(error)
+      if (!data.user) {
+        throw new AccountEmailError('email_update_failed', 'The email change could not be started')
+      }
+      return { email: normalizedEmail, confirmationRequired: true }
+    }
+  },
   products: {
     list: (signal?: AbortSignal) =>
       unwrap<Product[]>(

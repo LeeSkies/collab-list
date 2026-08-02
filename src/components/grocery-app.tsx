@@ -8,6 +8,7 @@ import {
   MagnifyingGlass,
   Plus,
   SignOut,
+  UserCircle,
   UsersThree,
   WifiSlash,
   X
@@ -35,6 +36,7 @@ import {
 import { PRODUCT_CATEGORIES, type ProductCategory } from '../lib/product-category'
 import type { Product, ProductChanges } from '../lib/types'
 import { TrailingRefresh } from '../lib/trailing-refresh'
+import { AccountDrawer } from './account-drawer'
 import { AdminDrawer } from './admin-drawer'
 import { CategoryFilterDrawer } from './category-filter-drawer'
 import { ProductDrawer } from './product-drawer'
@@ -56,6 +58,7 @@ export function GroceryApp() {
   })
   const [selected, setSelected] = useState<Product | null>(null)
   const [adminOpen, setAdminOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [categoryFilterOpen, setCategoryFilterOpen] = useState(false)
   const [categoryFilters, setCategoryFilters] = useState<ReadonlySet<ProductCategory>>(new Set())
   const [restoreAllOpen, setRestoreAllOpen] = useState(false)
@@ -143,6 +146,7 @@ export function GroceryApp() {
       }
       setSelected(null)
       setAdminOpen(false)
+      setAccountOpen(false)
       setCategoryFilterOpen(false)
       setRestoreAllOpen(false)
       setCategoryFilters(new Set())
@@ -557,6 +561,7 @@ export function GroceryApp() {
   return (
     <main className="app-shell">
       <AppHeader
+        onAccount={() => setAccountOpen(true)}
         onAdmin={() => setAdminOpen(true)}
         pendingRequestCount={pendingRequests.data?.length ?? 0}
       />
@@ -737,6 +742,7 @@ export function GroceryApp() {
           paidBoundaryNeedsAttention={paidBoundaryNeedsAttention}
         />
       )}
+      <AccountDrawer open={accountOpen} onOpenChange={setAccountOpen} />
       {auth.profile?.role === 'admin' && (
         <AdminDrawer open={adminOpen} onOpenChange={setAdminOpen} canMutate={canMutate} />
       )}
@@ -828,9 +834,11 @@ function AppToast({ message }: { message: string }) {
 }
 
 function AppHeader({
+  onAccount,
   onAdmin,
   pendingRequestCount
 }: {
+  onAccount(): void
   onAdmin(): void
   pendingRequestCount: number
 }) {
@@ -843,6 +851,9 @@ function AppHeader({
         <h1>{t('appName')}</h1>
       </div>
       <nav>
+        <button className="icon-button" onClick={onAccount} aria-label={t('account')}>
+          <UserCircle />
+        </button>
         {auth.profile?.role === 'admin' && (
           <button
             className="icon-button admin-menu-button"

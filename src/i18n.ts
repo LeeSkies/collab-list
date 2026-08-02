@@ -264,6 +264,21 @@ const resources = {
       subscriptionAlreadyActive: 'This household already has an active subscription.',
       noSubscriptionToResubscribe: 'There is no previous subscription to resume.',
       currentUser: 'You',
+      account: 'Account',
+      currentEmail: 'Current email',
+      newEmail: 'New email',
+      accountEmailBody:
+        'Change the email for your account. Your household access, role, and list stay unchanged.',
+      accountEmailOldRemains:
+        'We will send a confirmation link to the new email. Your current email remains active until confirmation. If enabled, Supabase will also notify your current email.',
+      accountEmailSend: 'Send confirmation email',
+      accountEmailSending: 'Sending…',
+      accountEmailConfirmationSent:
+        'Confirmation sent to {{email}}. Your current email remains active until you confirm.',
+      accountEmailInvalid: 'Enter a valid email address.',
+      accountEmailDuplicate: 'That email is already in use.',
+      accountEmailRateLimited: 'Too many requests. Please try again later.',
+      accountEmailFailed: 'We could not start the email change. Please try again.',
       updateReady: 'A new version is ready.',
       update: 'Update',
       productTourEyebrow: 'A quick tour',
@@ -521,6 +536,21 @@ const resources = {
       subscriptionAlreadyActive: 'למשק הבית הזה כבר יש מנוי פעיל.',
       noSubscriptionToResubscribe: 'אין מנוי קודם לחידוש.',
       currentUser: 'אתם',
+      account: 'החשבון',
+      currentEmail: 'האימייל הנוכחי',
+      newEmail: 'אימייל חדש',
+      accountEmailBody:
+        'שנו את האימייל של החשבון. הגישה למשק הבית, התפקיד והרשימה יישארו ללא שינוי.',
+      accountEmailOldRemains:
+        'נשלח קישור אישור לאימייל החדש. האימייל הנוכחי יישאר פעיל עד האישור. אם האפשרות מופעלת, Supabase ישלח הודעה גם לאימייל הנוכחי.',
+      accountEmailSend: 'שליחת אימייל אישור',
+      accountEmailSending: 'שולחים…',
+      accountEmailConfirmationSent:
+        'קישור אישור נשלח אל {{email}}. האימייל הנוכחי יישאר פעיל עד האישור.',
+      accountEmailInvalid: 'יש להזין כתובת אימייל תקינה.',
+      accountEmailDuplicate: 'האימייל הזה כבר בשימוש.',
+      accountEmailRateLimited: 'נשלחו יותר מדי בקשות. נסו שוב מאוחר יותר.',
+      accountEmailFailed: 'לא הצלחנו להתחיל את שינוי האימייל. נסו שוב.',
       updateReady: 'גרסה חדשה מוכנה.',
       update: 'עדכון',
       productTourEyebrow: 'סיור קצר',
