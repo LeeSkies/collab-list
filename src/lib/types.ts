@@ -45,6 +45,13 @@ export interface HouseholdMembership {
   updated_at: string
 }
 
+export interface HouseholdCreation {
+  household_id: string
+  household_name: string
+  trial_starts_at: string
+  trial_ends_at: string
+}
+
 export interface AdminUser {
   id: string
   name: string

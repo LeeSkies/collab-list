@@ -1,5 +1,13 @@
 import type { Session, User } from '@supabase/supabase-js'
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from 'react'
 import { api } from './lib/api'
 import { supabase } from './lib/supabase'
 import type { Profile } from './lib/types'
@@ -10,6 +18,8 @@ interface AuthValue {
   profile: Profile | null
   restoring: boolean
   signIn(email: string, password: string): Promise<void>
+  signUp(email: string, password: string, name: string): Promise<{ confirmationRequired: boolean }>
+  refreshProfile(): Promise<void>
   signOut(): Promise<void>
 }
 
@@ -19,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [restoring, setRestoring] = useState(true)
+  const sessionRef = useRef<Session | null>(null)
 
   useEffect(() => {
     let active = true
@@ -30,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     function applySession(next: Session | null) {
+      sessionRef.current = next
       const version = ++loadVersion
       const nextUserId = next?.user.id ?? null
       const userChanged = currentUserId !== nextUserId
@@ -130,6 +142,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async signIn(email, password) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
+      },
+      async signUp(email, password, name) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { name },
+            emailRedirectTo: new URL(import.meta.env.BASE_URL, window.location.origin).toString()
+          }
+        })
+        if (error) throw error
+        return { confirmationRequired: !data.session }
+      },
+      async refreshProfile() {
+        const id = sessionRef.current?.user.id
+        if (!id) return
+        const isCurrentSession = () => sessionRef.current?.user.id === id
+        const nextProfile = await api.profile.current(id)
+        if (!isCurrentSession()) return
+        const membership = await api.household.current(id)
+        if (!isCurrentSession()) return
+        setProfile((current) =>
+          isCurrentSession()
+            ? { ...nextProfile, household_id: membership.household_id, role: membership.role }
+            : current
+        )
       },
       async signOut() {
         await supabase.auth.signOut()

@@ -4,7 +4,15 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth'
 import { Button } from './ui/button'
 
-export function LoginForm() {
+export function LoginForm({
+  onCreateHousehold,
+  showCreateHousehold = true,
+  inviteMode = false
+}: {
+  onCreateHousehold?: () => void
+  showCreateHousehold?: boolean
+  inviteMode?: boolean
+}) {
   const { t } = useTranslation()
   const { signIn } = useAuth()
   const [pending, setPending] = useState(false)
@@ -34,6 +42,7 @@ export function LoginForm() {
       </div>
       <section className="login-card">
         <h1>{t('appName')}</h1>
+        <p className="login-welcome">{inviteMode ? t('inviteSignInHint') : t('loginWelcome')}</p>
         <form onSubmit={submit}>
           <label>
             <span>{t('email')}</span>
@@ -64,6 +73,16 @@ export function LoginForm() {
             {pending ? t('signingIn') : t('login')}
           </Button>
         </form>
+        {showCreateHousehold && onCreateHousehold && (
+          <Button
+            className="login-create"
+            size="lg"
+            variant="secondary"
+            onClick={onCreateHousehold}
+          >
+            {t('createHousehold')}
+          </Button>
+        )}
       </section>
     </main>
   )

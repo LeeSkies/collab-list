@@ -8,10 +8,13 @@ node_modules/
 dist/
 coverage/
 playwright-report/
+.playwright/
 test-results/
 .vite/
 .spec-workflow/
 prototypes/
+.pi-subagents/
+.workflow/
 
 # Supabase local runtime state
 supabase/.branches/

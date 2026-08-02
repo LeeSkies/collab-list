@@ -1,14 +1,16 @@
 import type { Session } from '@supabase/supabase-js'
+import userEvent from '@testing-library/user-event'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getSession, onAuthStateChange, profileCurrent, householdCurrent, realtimeChannel } =
+const { getSession, onAuthStateChange, profileCurrent, householdCurrent, realtimeChannel, signUp } =
   vi.hoisted(() => ({
     getSession: vi.fn(),
     onAuthStateChange: vi.fn(),
     profileCurrent: vi.fn(),
     householdCurrent: vi.fn(),
-    realtimeChannel: vi.fn()
+    realtimeChannel: vi.fn(),
+    signUp: vi.fn()
   }))
 
 vi.mock('./lib/api', () => ({
@@ -19,7 +21,7 @@ vi.mock('./lib/api', () => ({
 }))
 vi.mock('./lib/supabase', () => ({
   supabase: {
-    auth: { getSession, onAuthStateChange },
+    auth: { getSession, onAuthStateChange, signUp },
     channel: realtimeChannel
   }
 }))
@@ -62,6 +64,21 @@ function Probe() {
   )
 }
 
+function SignUpProbe() {
+  const auth = useAuth()
+  return (
+    <>
+      <span data-testid="restoring">{String(auth.restoring)}</span>
+      <button onClick={() => void auth.signUp('new@example.com', 'password123', 'New User')} />
+    </>
+  )
+}
+
+function RefreshProbe() {
+  const auth = useAuth()
+  return <button onClick={() => void auth.refreshProfile()}>Refresh profile</button>
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((res) => {
@@ -81,6 +98,7 @@ describe('AuthProvider profile identity guard', () => {
     profileCurrent.mockReset()
     householdCurrent.mockReset()
     realtimeChannel.mockReset()
+    signUp.mockReset()
     authCallback = undefined
     membershipCallback = undefined
     membershipConfig = undefined
@@ -125,6 +143,37 @@ describe('AuthProvider profile identity guard', () => {
     await waitFor(() => expect(screen.getByTestId('identity')).toHaveTextContent('signed-out'))
     expect(screen.getByTestId('identity')).toHaveTextContent('no-profile')
     expect(householdCurrent).not.toHaveBeenCalled()
+  })
+
+  it('does not install a refreshed profile after the current user signs out', async () => {
+    const current = session('user-a')
+    const refreshLoad = deferred<ReturnType<typeof profile>>()
+    getSession.mockResolvedValue({ data: { session: current } })
+    profileCurrent.mockResolvedValue(profile('user-a'))
+    householdCurrent.mockResolvedValue(membership('user-a', 'household-a'))
+
+    const user = userEvent.setup()
+    render(
+      <AuthProvider>
+        <Probe />
+        <RefreshProbe />
+      </AuthProvider>
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('identity')).toHaveTextContent('user-a:user-a:household-a')
+    )
+
+    profileCurrent.mockReturnValueOnce(refreshLoad.promise)
+    await user.click(screen.getByRole('button', { name: 'Refresh profile' }))
+    await waitFor(() => expect(profileCurrent).toHaveBeenCalledTimes(2))
+
+    act(() => authCallback?.('SIGNED_OUT', null))
+    refreshLoad.resolve(profile('user-a', 'admin'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('identity')).toHaveTextContent('signed-out:no-profile:no-household')
+    )
+    expect(householdCurrent).toHaveBeenCalledTimes(1)
   })
 
   it('keeps restoration pending until the profile and membership are loaded', async () => {
@@ -180,6 +229,29 @@ describe('AuthProvider profile identity guard', () => {
     await waitFor(() =>
       expect(screen.getByTestId('identity')).toHaveTextContent('user-a:no-profile:no-household')
     )
+  })
+
+  it('uses the Vite base URL for email confirmation redirects', async () => {
+    getSession.mockResolvedValue({ data: { session: null } })
+    signUp.mockResolvedValue({ data: { session: null }, error: null })
+
+    const user = userEvent.setup()
+    render(
+      <AuthProvider>
+        <SignUpProbe />
+      </AuthProvider>
+    )
+    await waitFor(() => expect(screen.getByTestId('restoring')).toHaveTextContent('false'))
+
+    await user.click(screen.getByRole('button'))
+    expect(signUp).toHaveBeenCalledWith({
+      email: 'new@example.com',
+      password: 'password123',
+      options: {
+        data: { name: 'New User' },
+        emailRedirectTo: new URL(import.meta.env.BASE_URL, window.location.origin).toString()
+      }
+    })
   })
 
   it('ignores a previous user load when the session switches users', async () => {

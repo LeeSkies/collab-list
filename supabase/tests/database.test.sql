@@ -1,10 +1,13 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(73);
+select plan(98);
 
 select has_table('public', 'products', 'products exists');
 select has_table('public', 'households', 'households exist');
 select has_table('public', 'household_members', 'household memberships exist');
+select has_table('public', 'household_trials', 'household trials exist');
+select has_column('public', 'household_trials', 'starts_at', 'trials record their start');
+select has_column('public', 'household_trials', 'ends_at', 'trials record their end');
 select has_column('public', 'products', 'household_id', 'products carry the household boundary');
 select is(
   (select relreplident::text from pg_class where oid = 'public.products'::regclass),
@@ -243,6 +246,43 @@ select
   raw_app_meta_data, '{"name":"Unassigned"}'::jsonb, now(), now()
 from auth.users
 where id = '10000000-0000-0000-0000-000000000001'::uuid;
+set local role postgres;
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, confirmation_token,
+  recovery_token, email_change_token_new, email_change, email_change_token_current,
+  phone_change_token, reauthentication_token, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+select
+  instance_id, '10000000-0000-0000-0000-000000000005'::uuid, aud, role,
+  'unconfirmed@example.com', encrypted_password, null, confirmation_token,
+  recovery_token, email_change_token_new, email_change, email_change_token_current,
+  phone_change_token, reauthentication_token, raw_app_meta_data, '{"name":"Unconfirmed"}'::jsonb, now(), now()
+from auth.users
+where id = '10000000-0000-0000-0000-000000000001'::uuid;
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, confirmation_token,
+  recovery_token, email_change_token_new, email_change, email_change_token_current,
+  phone_change_token, reauthentication_token, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+select
+  instance_id, '10000000-0000-0000-0000-000000000008'::uuid, aud, role,
+  'long-name@example.com', encrypted_password, email_confirmed_at, confirmation_token,
+  recovery_token, email_change_token_new, email_change, email_change_token_current,
+  phone_change_token, reauthentication_token, raw_app_meta_data,
+  jsonb_build_object('name', repeat('L', 80)), now(), now()
+from auth.users
+where id = '10000000-0000-0000-0000-000000000001'::uuid;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000005';
+select throws_ok(
+  $$ select public.create_household_with_trial() $$,
+  '42501',
+  'email_confirmation_required',
+  'unconfirmed users cannot create a household'
+);
+set local role postgres;
+select is((select count(*) from public.households), 2::bigint, 'unconfirmed household creation is not persisted');
+
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000004';
 select throws_ok(
@@ -252,6 +292,78 @@ select throws_ok(
   'RPC requires household membership'
 );
 select is((select count(*) from public.products), 0::bigint, 'unassigned user cannot read products');
+select lives_ok(
+  $$ select public.create_household_with_trial() $$,
+  'verified unassigned user can create a household and trial'
+);
+set local role postgres;
+select is((select count(*) from public.households), 3::bigint, 'household creation adds one household');
+select is((select count(*) from public.household_trials), 1::bigint, 'household creation adds one trial');
+select is(
+  (select ends_at - starts_at from public.household_trials),
+  interval '14 days',
+  'new household trials last fourteen days'
+);
+select is(
+  (select h.name from public.households as h join public.household_trials as t on t.household_id = h.id),
+  'Unassigned''s household',
+  'new households get a friendly creator-based name'
+);
+select is(
+  (select hm.role from public.household_members as hm where hm.user_id = '10000000-0000-0000-0000-000000000004'::uuid),
+  'admin',
+  'household creator is the admin'
+);
+select is(
+  (select count(*) from public.household_members where user_id = '10000000-0000-0000-0000-000000000004'::uuid),
+  1::bigint,
+  'household creation adds exactly one membership'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
+select throws_ok(
+  $$ select public.create_household_with_trial() $$,
+  '23505',
+  'household_membership_exists',
+  'members cannot create another household'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000004';
+select is(
+  (select household_id from public.create_household_with_trial()),
+  (select household_id from public.household_members where user_id = '10000000-0000-0000-0000-000000000004'::uuid),
+  'retry returns the existing household'
+);
+select is(
+  (select trial_ends_at - trial_starts_at from public.create_household_with_trial()),
+  interval '14 days',
+  'retry returns the existing trial'
+);
+set local role postgres;
+select is((select count(*) from public.households), 3::bigint, 'retry does not create a second household');
+select is((select count(*) from public.household_trials), 1::bigint, 'retry does not create a second trial');
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000008';
+select lives_ok(
+  $$ select public.create_household_with_trial() $$,
+  'long creator names can create a household'
+);
+set local role postgres;
+select is((select count(*) from public.households), 4::bigint, 'long-name household creation adds one household');
+select is((select count(*) from public.household_trials), 2::bigint, 'long-name household creation adds one trial');
+select is(
+  (select char_length(h.name) from public.households as h join public.household_members as hm on hm.household_id = h.id where hm.user_id = '10000000-0000-0000-0000-000000000008'::uuid),
+  80,
+  'long creator names produce an eighty-character household name'
+);
+select is(
+  (select h.name from public.households as h join public.household_members as hm on hm.household_id = h.id where hm.user_id = '10000000-0000-0000-0000-000000000008'::uuid),
+  repeat('L', 68) || '''s household',
+  'long creator names preserve the household suffix'
+);
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000004';
+select is((select count(*) from public.household_trials), 1::bigint, 'household members can read their household trial');
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select is((select count(*) from public.household_trials), 0::bigint, 'household trial RLS hides other household trials');
 
 set local role anon;
 select throws_ok(
@@ -259,6 +371,12 @@ select throws_ok(
   '42501',
   'permission denied for table products',
   'anonymous users cannot read products'
+);
+select throws_ok(
+  $$ select count(*) from public.household_trials $$,
+  '42501',
+  'permission denied for table household_trials',
+  'anonymous users cannot read household trials'
 );
 
 select * from finish();

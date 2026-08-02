@@ -1,6 +1,13 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import type { AdminUser, HouseholdMembership, Product, ProductChanges, Profile } from './types'
+import type {
+  AdminUser,
+  HouseholdCreation,
+  HouseholdMembership,
+  Product,
+  ProductChanges,
+  Profile
+} from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -118,7 +125,11 @@ export const api = {
     current: (userId: string) =>
       unwrap<HouseholdMembership>(
         supabase.from('household_members').select('*').eq('user_id', userId).single()
-      )
+      ),
+    create: async () => {
+      const rows = await unwrap<HouseholdCreation[]>(supabase.rpc('create_household_with_trial'))
+      return rows[0]!
+    }
   },
   admin: {
     invoke: async <T>(action: string, body?: Record<string, unknown>) => {

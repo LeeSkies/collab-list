@@ -67,6 +67,35 @@ export type Database = {
           }
         ]
       }
+      household_trials: {
+        Row: {
+          created_at: string
+          ends_at: string
+          household_id: string
+          starts_at: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at: string
+          household_id: string
+          starts_at?: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          household_id?: string
+          starts_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'household_trials_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: true
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       households: {
         Row: {
           created_at: string
@@ -225,6 +254,15 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      create_household_with_trial: {
+        Args: never
+        Returns: {
+          household_id: string
+          household_name: string
+          trial_ends_at: string
+          trial_starts_at: string
+        }[]
       }
       create_product: {
         Args: { p_name: string }

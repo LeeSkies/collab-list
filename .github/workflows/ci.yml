@@ -33,8 +33,9 @@ jobs:
       - run: npx supabase start
       - run: npx supabase test db
       - run: npx supabase db lint --local
+      - name: Stop Supabase before browser tests
+        if: always()
+        run: npx supabase@2.109.1 stop
       - run: npx playwright install --with-deps chromium
       - name: Run browser tests against local Supabase
-        run: |
-          eval "$(npx supabase status -o env)"
-          VITE_SUPABASE_URL="$API_URL" VITE_SUPABASE_PUBLISHABLE_KEY="$ANON_KEY" npx playwright test --project=mobile-chromium
+        run: npx playwright test --project=mobile-chromium

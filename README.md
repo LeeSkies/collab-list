@@ -34,7 +34,7 @@ The local seed creates:
 - `admin@example.com` / `password123`
 - `member@example.com` / `password123`
 
-These credentials are local fixtures only.
+These credentials are local fixtures only. Playwright creates unique, confirmed local identities for onboarding tests and removes them after the run.
 
 ## Database workflow
 
@@ -61,7 +61,7 @@ npx supabase db push
 npx supabase functions deploy admin-users
 ```
 
-In the hosted Auth settings, keep public email registration disabled. Create the initial admin through the Supabase dashboard or a one-time trusted script, then set that profile's role to `admin`. After the tenancy migration, also provision the initial household and add that admin to `household_members`; setting `profiles.role` alone does not grant household access. Add the hosted browser-safe URL and publishable key to the deployment environment; never expose the secret/service-role key.
+In the hosted Auth settings, enable email/password registration with email confirmations for the create-household flow. Email confirmation redirects use the Vite base URL (for example, `/collab-list/` on GitHub Pages), so add that exact deployed URL to the hosted Auth redirect allowlist; this repository only configures local root URLs. Create the initial migrated admin through the Supabase dashboard or a one-time trusted script, then set that profile's role to `admin`. After the tenancy migration, also provision the initial household and add that admin to `household_members`; setting `profiles.role` alone does not grant household access. Add the hosted browser-safe URL and publishable key to the deployment environment; never expose the secret/service-role key.
 
 ## Verification
 
@@ -72,7 +72,10 @@ npm run typecheck
 npm test
 npm run build
 npm run db:test
+npm run db:lint
 npm run test:e2e
 ```
+
+Playwright starts and resets the local Supabase project before its run. It provisions unique confirmed users through the local admin API for the verified onboarding case, while signup tests still use the normal email-confirmation gate. Test users are deleted during teardown.
 
 The PWA service worker caches only static build assets. Product data is not persisted for offline reading and mutations are never queued offline.

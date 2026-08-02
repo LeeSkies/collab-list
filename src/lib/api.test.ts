@@ -10,6 +10,30 @@ vi.mock('./supabase', () => ({ supabase: { channel, from, rpc } }))
 
 import { api, ApiError, isProductConflict } from './api'
 
+describe('household.create', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('calls the atomic household and trial creation RPC', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          household_id: 'household-id',
+          household_name: "New Admin's household",
+          trial_starts_at: '2026-08-02T00:00:00Z',
+          trial_ends_at: '2026-08-16T00:00:00Z'
+        }
+      ],
+      error: null
+    })
+
+    await expect(api.household.create()).resolves.toMatchObject({
+      household_id: 'household-id',
+      trial_ends_at: '2026-08-16T00:00:00Z'
+    })
+    expect(rpc).toHaveBeenCalledWith('create_household_with_trial')
+  })
+})
+
 describe('products.update', () => {
   beforeEach(() => {
     channel.mockReset()
