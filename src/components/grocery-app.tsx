@@ -69,9 +69,13 @@ export function GroceryApp() {
     bulk: false
   })
   const searchRef = useRef<HTMLInputElement>(null)
+  const householdId = auth.profile?.household_id
+  const previousHouseholdId = useRef<string | undefined>(householdId)
+  const productsQueryKey = useMemo(() => ['products', householdId] as const, [householdId])
   const products = useQuery({
-    queryKey: ['products'],
+    queryKey: productsQueryKey,
     queryFn: ({ signal }) => api.products.list(signal),
+    enabled: Boolean(householdId),
     retry: 1,
     staleTime: 0,
     gcTime: 0
@@ -80,10 +84,28 @@ export function GroceryApp() {
     !products.isLoading && !products.isError && (!online || realtime === 'disconnected')
 
   useEffect(() => {
+    const previous = previousHouseholdId.current
+    if (!householdId) client.removeQueries({ queryKey: ['products'] })
+    if (previous !== householdId) {
+      if (previous) {
+        client.removeQueries({ queryKey: ['products', previous], exact: true })
+      }
+      setSelected(null)
+      setAdminOpen(false)
+      setCategoryFilterOpen(false)
+      setRestoreAllOpen(false)
+      setCategoryFilters(new Set())
+      previousHouseholdId.current = householdId
+    }
+  }, [client, householdId])
+
+  useEffect(() => {
     const online = () => {
       setOnline(true)
       setToast(t('connected'))
-      void client.refetchQueries({ queryKey: ['products'], type: 'active' })
+      if (householdId) {
+        void client.refetchQueries({ queryKey: productsQueryKey, type: 'active' })
+      }
     }
     const offline = () => setOnline(false)
     addEventListener('online', online)
@@ -92,7 +114,7 @@ export function GroceryApp() {
       removeEventListener('online', online)
       removeEventListener('offline', offline)
     }
-  }, [client, t])
+  }, [client, householdId, productsQueryKey, t])
 
   useEffect(() => {
     if (!toast) return
@@ -101,9 +123,13 @@ export function GroceryApp() {
   }, [toast])
 
   useEffect(() => {
+    if (!householdId) return
     const refresher = new TrailingRefresh(
       () =>
-        client.refetchQueries({ queryKey: ['products'], type: 'active' }, { throwOnError: true }),
+        client.refetchQueries(
+          { queryKey: productsQueryKey, type: 'active' },
+          { throwOnError: true }
+        ),
       100
     )
     const channel = api.realtime.subscribe(
@@ -117,13 +143,14 @@ export function GroceryApp() {
               : 'connecting'
         )
         if (status === 'SUBSCRIBED') refresher.runNow()
-      }
+      },
+      householdId
     )
     return () => {
       refresher.dispose()
       void channel.unsubscribe()
     }
-  }, [client])
+  }, [client, householdId, productsQueryKey])
 
   useEffect(() => {
     const timeout = window.setTimeout(
@@ -134,9 +161,10 @@ export function GroceryApp() {
   }, [connectionWarningEligible])
 
   const list = useMemo(() => products.data ?? [], [products.data])
-  const selectedProduct = selected
-    ? (list.find((product) => product.id === selected.id) ?? selected)
-    : null
+  const selectedProduct =
+    selected && selected.household_id === householdId
+      ? (list.find((product) => product.id === selected.id) ?? selected)
+      : null
   const categoryFilterActive =
     categoryFilters.size > 0 && categoryFilters.size < PRODUCT_CATEGORIES.length
   const filteredList = useMemo(
@@ -153,12 +181,12 @@ export function GroceryApp() {
   const duplicate = signature
     ? list.find((product) => product.name_signature === signature)
     : undefined
-  const canCreate = Boolean(normalizeText(search)) && !duplicate
+  const canCreate = Boolean(householdId && normalizeText(search)) && !duplicate
 
   async function refreshProducts(productId?: string) {
     try {
       await client.refetchQueries(
-        { queryKey: ['products'], type: 'active' },
+        { queryKey: productsQueryKey, type: 'active' },
         { throwOnError: true }
       )
     } catch {
@@ -169,7 +197,7 @@ export function GroceryApp() {
     }
     if (!productId) return
     const latest = client
-      .getQueryData<Product[]>(['products'])
+      .getQueryData<Product[]>(productsQueryKey)
       ?.find((product) => product.id === productId)
     setSelected((current) => (current?.id === productId ? (latest ?? null) : current))
     return true
@@ -222,20 +250,23 @@ export function GroceryApp() {
     })
   }
   function replaceProduct(next: Product) {
-    client.setQueryData<Product[]>(['products'], (current = []) =>
+    if (!householdId || next.household_id !== householdId) return
+    client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
       current.map((product) => (product.id === next.id ? next : product))
     )
   }
   function rollbackProduct(optimistic: Product, previous: Product) {
-    client.setQueryData<Product[]>(['products'], (current = []) =>
+    if (!householdId || optimistic.household_id !== householdId) return
+    client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
       rollbackOptimisticProduct(current, optimistic, previous)
     )
   }
   const create = useMutation({
     mutationFn: api.products.create,
     onSuccess: (product) => {
+      if (!householdId || product.household_id !== householdId) return
       setEnteringProductIds((current) => new Set(current).add(product.id))
-      client.setQueryData<Product[]>(['products'], (current = []) => [
+      client.setQueryData<Product[]>(productsQueryKey, (current = []) => [
         product,
         ...current.filter((item) => item.id !== product.id)
       ])
@@ -248,9 +279,9 @@ export function GroceryApp() {
     mutationFn: ({ product, delta }: { product: Product; delta: 1 | -1 }) =>
       api.products.adjust(product.id, delta, product.version),
     onMutate: async ({ product, delta }) => {
-      await client.cancelQueries({ queryKey: ['products'] })
+      await client.cancelQueries({ queryKey: productsQueryKey })
       const previous =
-        client.getQueryData<Product[]>(['products'])?.find((item) => item.id === product.id) ??
+        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === product.id) ??
         product
       const optimistic = {
         ...previous,
@@ -269,9 +300,9 @@ export function GroceryApp() {
   const toggle = useMutation({
     mutationFn: api.products.toggle,
     onMutate: async (product) => {
-      await client.cancelQueries({ queryKey: ['products'] })
+      await client.cancelQueries({ queryKey: productsQueryKey })
       const previous =
-        client.getQueryData<Product[]>(['products'])?.find((item) => item.id === product.id) ??
+        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === product.id) ??
         product
       const now = new Date().toISOString()
       const optimistic = {
@@ -286,7 +317,8 @@ export function GroceryApp() {
     },
     onSuccess: (next) => {
       replaceProduct(next)
-      if (selected?.id === next.id) setSelected(next)
+      if (householdId && selected?.id === next.id && selected.household_id === householdId)
+        setSelected(next)
     },
     onError: async (reason, variables, context) => {
       if (context) rollbackProduct(context.optimistic, context.previous)
@@ -298,16 +330,18 @@ export function GroceryApp() {
       api.products.update(product, changes),
     onSuccess: (next) => {
       replaceProduct(next)
-      setSelected(next)
+      if (householdId && next.household_id === householdId) setSelected(next)
     },
     onError: (reason, variables) => mutationError(reason, variables.product.id)
   })
   const remove = useMutation({
     mutationFn: api.products.remove,
-    onSuccess: (_, product) =>
-      client.setQueryData<Product[]>(['products'], (current = []) =>
+    onSuccess: (_, product) => {
+      if (!householdId || product.household_id !== householdId) return
+      client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
         current.filter((item) => item.id !== product.id)
-      ),
+      )
+    },
     onError: (reason, product) => mutationError(reason, product.id)
   })
   const restoreAll = useMutation({
@@ -319,8 +353,13 @@ export function GroceryApp() {
       resetQuantities: boolean
     }) => api.products.restoreAll(clearNotes, resetQuantities),
     onSuccess: (restored) => {
-      const restoredById = new Map(restored.map((product) => [product.id, product]))
-      client.setQueryData<Product[]>(['products'], (current = []) =>
+      if (!householdId) return
+      const restoredById = new Map(
+        restored
+          .filter((product) => product.household_id === householdId)
+          .map((product) => [product.id, product])
+      )
+      client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
         current.map((product) => restoredById.get(product.id) ?? product)
       )
       setRestoreAllOpen(false)

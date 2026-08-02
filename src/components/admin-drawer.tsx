@@ -1,6 +1,6 @@
 import { Trash, UserPlus } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth'
 import { api } from '../lib/api'
@@ -20,16 +20,29 @@ export function AdminDrawer({
   const client = useQueryClient()
   const [removeUser, setRemoveUser] = useState<AdminUser | null>(null)
   const [error, setError] = useState('')
-  const users = useQuery({ queryKey: ['admin-users'], queryFn: api.admin.list, enabled: open })
+  const householdId = auth.profile?.household_id
+  const previousHouseholdId = useRef(householdId)
+  const usersQueryKey = ['admin-users', householdId] as const
+  useEffect(() => {
+    if (previousHouseholdId.current === householdId) return
+    setRemoveUser(null)
+    setError('')
+    previousHouseholdId.current = householdId
+  }, [householdId])
+  const users = useQuery({
+    queryKey: usersQueryKey,
+    queryFn: api.admin.list,
+    enabled: open && Boolean(householdId)
+  })
   const create = useMutation({
     mutationFn: ({ name, email, password }: { name: string; email: string; password: string }) =>
       api.admin.create(name, email, password),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['admin-users'] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: usersQueryKey }),
     onError: () => setError(t('requestFailed'))
   })
   const remove = useMutation({
     mutationFn: (id: string) => api.admin.remove(id),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['admin-users'] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: usersQueryKey }),
     onError: () => setError(t('requestFailed'))
   })
 
@@ -94,7 +107,7 @@ export function AdminDrawer({
               {user.id !== auth.user?.id && (
                 <button
                   className="icon-button danger-quiet"
-                  aria-label={`${t('delete')} ${user.name}`}
+                  aria-label={`${t('removeMember')} ${user.name}`}
                   onClick={() => setRemoveUser(user)}
                 >
                   <Trash />
@@ -108,9 +121,9 @@ export function AdminDrawer({
         <ConfirmDialog
           open
           onOpenChange={(next) => !next && setRemoveUser(null)}
-          title={t('deleteUserTitle', { name: removeUser.name })}
-          body={t('deleteUserBody')}
-          confirmLabel={t('delete')}
+          title={t('removeMemberTitle', { name: removeUser.name })}
+          body={t('removeMemberBody')}
+          confirmLabel={t('removeMember')}
           destructive
           onConfirm={() => {
             remove.mutate(removeUser.id)

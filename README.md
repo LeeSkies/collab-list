@@ -47,7 +47,7 @@ npm run db:lint
 npm run types:supabase
 ```
 
-The schema enforces duplicate product signatures, quantity bounds, optimistic versions, atomic quantity/pick operations, history insertion, and RLS. Product mutations go through authenticated database functions. Auth administration goes through `supabase/functions/admin-users`; its service-role credential remains server-side.
+The schema enforces duplicate product signatures, quantity bounds, optimistic versions, atomic quantity/pick operations, product audit columns, and RLS; it does not include a `product_pick_history` table or API. Product mutations go through authenticated database functions. Auth administration goes through `supabase/functions/admin-users`; its service-role credential remains server-side.
 
 ## Hosted Supabase
 
@@ -61,7 +61,7 @@ npx supabase db push
 npx supabase functions deploy admin-users
 ```
 
-In the hosted Auth settings, keep public email registration disabled. Create the initial admin through the Supabase dashboard or a one-time trusted script, then set that profile's role to `admin`. Add the hosted browser-safe URL and publishable key to the deployment environment; never expose the secret/service-role key.
+In the hosted Auth settings, keep public email registration disabled. Create the initial admin through the Supabase dashboard or a one-time trusted script, then set that profile's role to `admin`. After the tenancy migration, also provision the initial household and add that admin to `household_members`; setting `profiles.role` alone does not grant household access. Add the hosted browser-safe URL and publishable key to the deployment environment; never expose the secret/service-role key.
 
 ## Verification
 

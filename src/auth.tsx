@@ -22,32 +22,104 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true
-    void supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return
-      setSession(data.session)
-      if (data.session)
-        setProfile(await api.profile.current(data.session.user.id).catch(() => null))
-      setRestoring(false)
-    })
+    let loadVersion = 0
+    let currentUserId: string | null = null
+
+    function finishRestore(version: number) {
+      if (active && version === loadVersion) setRestoring(false)
+    }
+
+    function applySession(next: Session | null) {
+      const version = ++loadVersion
+      const nextUserId = next?.user.id ?? null
+      const userChanged = currentUserId !== nextUserId
+      currentUserId = nextUserId
+      setSession(next)
+      if (userChanged) setProfile(null)
+      setRestoring(Boolean(next))
+      if (next) queueMicrotask(() => void loadProfile(next.user.id, version))
+      else setRestoring(false)
+    }
+
+    async function loadProfile(id: string, version: number) {
+      const profile = await api.profile.current(id).catch(() => null)
+      if (!active || version !== loadVersion || currentUserId !== id) return
+      if (!profile) {
+        setProfile(null)
+        finishRestore(version)
+        return
+      }
+      const membership = await api.household.current(id).catch(() => null)
+      if (!active || version !== loadVersion || currentUserId !== id) return
+      setProfile(
+        membership
+          ? { ...profile, household_id: membership.household_id, role: membership.role }
+          : null
+      )
+      finishRestore(version)
+    }
+
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active || loadVersion !== 0) return
+        applySession(data.session)
+      })
+      .catch(() => {
+        if (!active || loadVersion !== 0) return
+        applySession(null)
+      })
     const { data } = supabase.auth.onAuthStateChange((_event, next) => {
       if (!active) return
-      setSession(next)
-      if (next)
-        queueMicrotask(
-          () =>
-            void api.profile
-              .current(next.user.id)
-              .then(setProfile)
-              .catch(() => setProfile(null))
-        )
-      else setProfile(null)
-      setRestoring(false)
+      applySession(next)
     })
     return () => {
       active = false
       data.subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    const userId = session?.user.id
+    if (!userId) return
+    const authenticatedUserId = userId
+    let active = true
+    function revalidateMembership() {
+      void api.household
+        .current(authenticatedUserId)
+        .then((membership) => {
+          if (!active) return
+          setProfile((current) =>
+            current && membership && current.id === authenticatedUserId
+              ? { ...current, household_id: membership.household_id, role: membership.role }
+              : current
+          )
+        })
+        .catch(() => {
+          if (!active) return
+          setProfile((current) => (current?.id === authenticatedUserId ? null : current))
+        })
+    }
+    const channel = supabase
+      .channel(`household-membership:${authenticatedUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'household_members',
+          filter: `user_id=eq.${authenticatedUserId}`
+        },
+        revalidateMembership
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') revalidateMembership()
+      })
+    return () => {
+      active = false
+      void channel.unsubscribe()
+    }
+  }, [session?.user.id])
 
   const value = useMemo<AuthValue>(
     () => ({

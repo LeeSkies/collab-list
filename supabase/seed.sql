@@ -13,6 +13,19 @@ on conflict (provider_id, provider) do nothing;
 
 update public.profiles set role = 'admin' where email = 'admin@example.com';
 
+insert into public.households(name)
+select 'Local household'
+where not exists (select 1 from public.households);
+
+insert into public.household_members(household_id, user_id, role)
+select
+  (select id from public.households order by created_at, id limit 1),
+  p.id,
+  case when p.email = 'admin@example.com' then 'admin' else 'member' end
+from public.profiles as p
+where p.email in ('admin@example.com', 'member@example.com')
+on conflict (user_id) do nothing;
+
 begin;
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';

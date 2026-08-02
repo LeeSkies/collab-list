@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import type { AdminUser, Product, ProductChanges, Profile } from './types'
+import type { AdminUser, HouseholdMembership, Product, ProductChanges, Profile } from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -114,6 +114,12 @@ export const api = {
     current: (id: string) =>
       unwrap<Profile>(supabase.from('profiles').select('*').eq('id', id).single())
   },
+  household: {
+    current: (userId: string) =>
+      unwrap<HouseholdMembership>(
+        supabase.from('household_members').select('*').eq('user_id', userId).single()
+      )
+  },
   admin: {
     invoke: async <T>(action: string, body?: Record<string, unknown>) => {
       const { data, error } = await supabase.functions.invoke('admin-users', {
@@ -129,10 +135,21 @@ export const api = {
     remove: (userId: string) => api.admin.invoke<{ ok: true }>('delete', { userId })
   },
   realtime: {
-    subscribe(onChange: () => void, onStatus: (status: string) => void): RealtimeChannel {
+    subscribe(
+      onChange: () => void,
+      onStatus: (status: string) => void,
+      householdId: string
+    ): RealtimeChannel {
+      if (!householdId) throw new ApiError('household_required', 'A household is required')
+      const change = {
+        event: '*' as const,
+        schema: 'public' as const,
+        table: 'products' as const,
+        filter: `household_id=eq.${householdId}`
+      }
       return supabase
-        .channel('shared-products')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, onChange)
+        .channel(`household-products:${householdId}`)
+        .on('postgres_changes', change, onChange)
         .subscribe(onStatus)
     }
   }

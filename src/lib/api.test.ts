@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }))
+const { channel, from, rpc } = vi.hoisted(() => ({
+  channel: vi.fn(),
+  from: vi.fn(),
+  rpc: vi.fn()
+}))
 
-vi.mock('./supabase', () => ({ supabase: { from, rpc } }))
+vi.mock('./supabase', () => ({ supabase: { channel, from, rpc } }))
 
 import { api, ApiError, isProductConflict } from './api'
 
 describe('products.update', () => {
   beforeEach(() => {
+    channel.mockReset()
     from.mockReset()
     rpc.mockReset()
   })
@@ -17,6 +22,7 @@ describe('products.update', () => {
 
     const result = await api.products.update(
       {
+        household_id: '20000000-0000-0000-0000-000000000001',
         id: '10000000-0000-0000-0000-000000000003',
         name: 'Milk',
         name_signature: '4:milk',
@@ -104,6 +110,35 @@ describe('products.list', () => {
     await expect(request).rejects.toMatchObject({ name: 'AbortError' })
     expect(abortSignal).toHaveBeenCalledOnce()
     expect(abortSignal.mock.calls[0]?.[0].aborted).toBe(true)
+  })
+})
+
+describe('realtime subscription', () => {
+  it('rejects a missing household ID instead of creating an unfiltered channel', () => {
+    expect(() => api.realtime.subscribe(vi.fn(), vi.fn(), '' as never)).toThrow(
+      'A household is required'
+    )
+    expect(channel).not.toHaveBeenCalled()
+  })
+
+  it('filters product changes to the current household', () => {
+    const on = vi.fn().mockReturnThis()
+    const subscribe = vi.fn()
+    channel.mockReturnValue({ on, subscribe })
+
+    api.realtime.subscribe(vi.fn(), vi.fn(), '20000000-0000-0000-0000-000000000001')
+
+    expect(channel).toHaveBeenCalledWith('household-products:20000000-0000-0000-0000-000000000001')
+    expect(on).toHaveBeenCalledWith(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'products',
+        filter: 'household_id=eq.20000000-0000-0000-0000-000000000001'
+      },
+      expect.any(Function)
+    )
   })
 })
 

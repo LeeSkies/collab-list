@@ -25,30 +25,47 @@ Deno.serve(async (request) => {
     })
     const { data: auth, error: authError } = await userClient.auth.getUser(token)
     if (authError || !auth.user) return json({ error: 'Authentication required' }, 401)
-    const { data: profile } = await userClient
-      .from('profiles')
-      .select('role')
-      .eq('id', auth.user.id)
+    const { data: membership, error: membershipError } = await userClient
+      .from('household_members')
+      .select('household_id,role')
+      .eq('user_id', auth.user.id)
+      .eq('role', 'admin')
       .single()
-    if (profile?.role !== 'admin') return json({ error: 'Admin access required' }, 403)
+    if (membershipError || membership?.role !== 'admin')
+      return json({ error: 'Admin access required' }, 403)
+    const householdId = membership.household_id
     const admin = createClient(url, service, {
       auth: { persistSession: false, autoRefreshToken: false }
     })
     const body = await request.json()
     if (body.action === 'list') {
-      const { data, error } = await admin
-        .from('profiles')
-        .select('id,name,email,role,created_at')
+      const { data: memberships, error: membershipsError } = await admin
+        .from('household_members')
+        .select('user_id,role')
+        .eq('household_id', householdId)
         .order('created_at')
-      if (error) throw error
+      if (membershipsError) throw membershipsError
+      const userIds = memberships.map((item) => item.user_id)
+      const { data: profiles, error: profilesError } = userIds.length
+        ? await admin.from('profiles').select('id,name,email,created_at').in('id', userIds)
+        : { data: [], error: null }
+      if (profilesError) throw profilesError
+      const profilesById = new Map(profiles.map((item) => [item.id, item]))
       return json({
-        users: data.map((item) => ({
-          id: item.id,
-          name: item.name,
-          email: item.email,
-          role: item.role,
-          createdAt: item.created_at
-        }))
+        users: memberships.flatMap((item) => {
+          const profile = profilesById.get(item.user_id)
+          return profile
+            ? [
+                {
+                  id: profile.id,
+                  name: profile.name,
+                  email: profile.email,
+                  role: item.role,
+                  createdAt: profile.created_at
+                }
+              ]
+            : []
+        })
       })
     }
     if (body.action === 'create') {
@@ -68,6 +85,13 @@ Deno.serve(async (request) => {
         user_metadata: { name: body.name.trim() }
       })
       if (error) return json({ error: 'Could not create user', code: error.code }, 400)
+      const { error: memberError } = await admin
+        .from('household_members')
+        .insert({ household_id: householdId, user_id: data.user.id, role: 'member' })
+      if (memberError) {
+        await admin.auth.admin.deleteUser(data.user.id)
+        return json({ error: 'Could not add user to household', code: memberError.code }, 400)
+      }
       return json(
         {
           user: {
@@ -83,9 +107,16 @@ Deno.serve(async (request) => {
     }
     if (body.action === 'delete') {
       if (body.userId === auth.user.id)
-        return json({ error: 'You cannot delete your own account' }, 400)
-      const { error } = await admin.auth.admin.deleteUser(body.userId)
-      if (error) return json({ error: 'Could not delete user', code: error.code }, 400)
+        return json({ error: 'You cannot remove yourself from the household' }, 400)
+      const { data: removed, error } = await admin
+        .from('household_members')
+        .delete()
+        .eq('household_id', householdId)
+        .eq('user_id', body.userId)
+        .eq('role', 'member')
+        .select('user_id')
+      if (error) return json({ error: 'Could not remove household member', code: error.code }, 400)
+      if (!removed.length) return json({ error: 'Household member not found' }, 404)
       return json({ ok: true })
     }
     return json({ error: 'Unknown action' }, 400)

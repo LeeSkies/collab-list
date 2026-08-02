@@ -5,6 +5,7 @@ import i18n from '../i18n'
 import type { Product } from '../lib/types'
 
 const product: Product = {
+  household_id: '20000000-0000-0000-0000-000000000001',
   id: '10000000-0000-0000-0000-000000000003',
   name: 'Milk',
   name_signature: '4:milk',

@@ -8,17 +8,21 @@ import { api } from '../lib/api'
 import { AdminDrawer } from './admin-drawer'
 
 vi.mock('../auth', () => ({
-  useAuth: () => ({ user: { id: 'admin-id' } })
+  useAuth: () => ({
+    user: { id: 'admin-id' },
+    profile: { household_id: 'household-a', role: 'admin' }
+  })
 }))
 
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function renderDrawer() {
-  const client = new QueryClient({
+function renderDrawer(
+  client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
   })
+) {
   render(
     <QueryClientProvider client={client}>
       <I18nextProvider i18n={i18n}>
@@ -26,6 +30,7 @@ function renderDrawer() {
       </I18nextProvider>
     </QueryClientProvider>
   )
+  return client
 }
 
 describe('AdminDrawer', () => {
@@ -50,7 +55,7 @@ describe('AdminDrawer', () => {
       }
     })
 
-    renderDrawer()
+    const client = renderDrawer()
 
     const name = screen.getByRole('textbox', { name: 'Name' })
     expect(name).toBeRequired()
@@ -70,5 +75,40 @@ describe('AdminDrawer', () => {
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith('Noa', 'noa@example.com', 'password123')
     )
+    expect(client.getQueryData(['admin-users'])).toBeUndefined()
+  })
+
+  it('does not reuse a member list cached for another household', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+    })
+    client.setQueryData(
+      ['admin-users', 'household-b'],
+      [
+        {
+          id: 'other-member',
+          name: 'Other household member',
+          email: 'other@example.com',
+          role: 'member',
+          createdAt: '2026-07-14T12:00:00.000Z'
+        }
+      ]
+    )
+    vi.spyOn(api.admin, 'list').mockResolvedValue([
+      {
+        id: 'member-id',
+        name: 'Dana',
+        email: 'dana@example.com',
+        role: 'member',
+        createdAt: '2026-07-14T12:00:00.000Z'
+      }
+    ])
+
+    renderDrawer(client)
+
+    expect(await screen.findByText('Dana')).toBeVisible()
+    expect(screen.queryByText('Other household member')).not.toBeInTheDocument()
+    expect(client.getQueryData(['admin-users'])).toBeUndefined()
+    expect(client.getQueryData(['admin-users', 'household-b'])).toBeDefined()
   })
 })

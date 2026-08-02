@@ -28,11 +28,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      household_members: {
+        Row: {
+          created_at: string
+          household_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          household_id: string
+          role: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          household_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'household_members_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: false
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'household_members_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: true
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      households: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: string
           created_at: string
           created_by: string
+          household_id: string
           id: string
           is_picked: boolean
           name: string
@@ -49,6 +110,7 @@ export type Database = {
           category?: string
           created_at?: string
           created_by?: string
+          household_id: string
           id?: string
           is_picked?: boolean
           name: string
@@ -65,6 +127,7 @@ export type Database = {
           category?: string
           created_at?: string
           created_by?: string
+          household_id?: string
           id?: string
           is_picked?: boolean
           name?: string
@@ -83,6 +146,13 @@ export type Database = {
             columns: ['created_by']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'products_household_fkey'
+            columns: ['household_id']
+            isOneToOne: false
+            referencedRelation: 'households'
             referencedColumns: ['id']
           },
           {
@@ -136,6 +206,7 @@ export type Database = {
           category: string
           created_at: string
           created_by: string
+          household_id: string
           id: string
           is_picked: boolean
           name: string
@@ -161,6 +232,7 @@ export type Database = {
           category: string
           created_at: string
           created_by: string
+          household_id: string
           id: string
           is_picked: boolean
           name: string
@@ -180,19 +252,26 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      current_household_id: { Args: never; Returns: string }
       delete_product: {
         Args: { p_expected_version: number; p_product_id: string }
+        Returns: boolean
+      }
+      is_household_member: {
+        Args: { p_household_id: string }
         Returns: boolean
       }
       normalize_product_name: { Args: { input: string }; Returns: string }
       product_name_signature: { Args: { input: string }; Returns: string }
       require_authenticated: { Args: never; Returns: string }
+      require_household_membership: { Args: never; Returns: string }
       restore_all_products: {
         Args: { p_clear_notes?: boolean; p_reset_quantities?: boolean }
         Returns: {
           category: string
           created_at: string
           created_by: string
+          household_id: string
           id: string
           is_picked: boolean
           name: string
@@ -222,6 +301,7 @@ export type Database = {
           category: string
           created_at: string
           created_by: string
+          household_id: string
           id: string
           is_picked: boolean
           name: string
@@ -255,6 +335,7 @@ export type Database = {
               category: string
               created_at: string
               created_by: string
+              household_id: string
               id: string
               is_picked: boolean
               name: string
@@ -286,6 +367,7 @@ export type Database = {
               category: string
               created_at: string
               created_by: string
+              household_id: string
               id: string
               is_picked: boolean
               name: string

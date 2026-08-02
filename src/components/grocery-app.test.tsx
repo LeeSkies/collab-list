@@ -10,14 +10,22 @@ import type { Product } from '../lib/types'
 import { GroceryApp } from './grocery-app'
 import { ProductSection } from './product-section'
 
-vi.mock('../auth', () => ({
-  useAuth: () => ({
-    profile: { role: 'member' },
+const { authState } = vi.hoisted(() => ({
+  authState: {
+    profile: {
+      role: 'member' as const,
+      household_id: '20000000-0000-0000-0000-000000000001'
+    },
     signOut: vi.fn()
-  })
+  }
+}))
+
+vi.mock('../auth', () => ({
+  useAuth: () => authState
 }))
 
 const boughtProduct: Product = {
+  household_id: '20000000-0000-0000-0000-000000000001',
   id: '10000000-0000-0000-0000-000000000003',
   name: 'Milk',
   name_signature: '4:milk',
@@ -65,6 +73,10 @@ function buildProductSection(
 }
 
 afterEach(async () => {
+  authState.profile = {
+    role: 'member',
+    household_id: '20000000-0000-0000-0000-000000000001'
+  }
   localStorage.removeItem('grocery-sort-mode')
   await i18n.changeLanguage('en')
   vi.restoreAllMocks()
@@ -308,6 +320,61 @@ describe('GroceryApp category filtering', () => {
 })
 
 describe('GroceryApp realtime categories', () => {
+  it('scopes query and realtime state to the authenticated household', async () => {
+    const user = userEvent.setup()
+    const secondHouseholdId = '20000000-0000-0000-0000-000000000002'
+    const secondHouseholdProduct = {
+      ...newProduct,
+      household_id: secondHouseholdId,
+      name: 'Bread'
+    }
+    vi.spyOn(api.products, 'list').mockImplementation(async () =>
+      authState.profile.household_id === secondHouseholdId
+        ? [secondHouseholdProduct]
+        : [boughtProduct]
+    )
+    const unsubscribe = vi.fn()
+    const subscribe = vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Edit Milk' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Edit Milk' }))
+    expect(screen.getByRole('dialog')).toBeVisible()
+    expect(client.getQueryData(['products'])).toBeUndefined()
+    expect(client.getQueryData(['products', boughtProduct.household_id])).toEqual([boughtProduct])
+    expect(subscribe).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      boughtProduct.household_id
+    )
+
+    authState.profile = { role: 'member', household_id: secondHouseholdId }
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Edit Bread' })).toBeVisible()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    expect(subscribe).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      secondHouseholdId
+    )
+    expect(client.getQueryData(['products', secondHouseholdId])).toEqual([secondHouseholdProduct])
+  })
+
   it('reconciles an open drawer with an authoritative category refetch', async () => {
     const user = userEvent.setup()
     const refreshedProduct = { ...boughtProduct, category: 'pantry' as const, version: 2 }

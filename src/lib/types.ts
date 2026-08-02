@@ -4,6 +4,7 @@ export type Role = 'admin' | 'member'
 
 export interface Profile {
   id: string
+  household_id?: string
   name: string
   email: string
   role: Role
@@ -12,6 +13,7 @@ export interface Profile {
 }
 
 export interface Product {
+  household_id: string
   id: string
   name: string
   name_signature: string
@@ -33,6 +35,14 @@ export interface ProductChanges {
   quantity: string
   notes: string
   category: ProductCategory
+}
+
+export interface HouseholdMembership {
+  household_id: string
+  user_id: string
+  role: Role
+  created_at: string
+  updated_at: string
 }
 
 export interface AdminUser {
