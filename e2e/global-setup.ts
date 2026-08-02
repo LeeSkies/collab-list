@@ -62,6 +62,14 @@ export default async function globalSetup(config: FullConfig) {
       ...Array.from({ length: project.retries + 1 }, (_, retry) => [
         `${project.name}-verified-${retry}`,
         `E2E ${project.name} verified ${retry}`
+      ]),
+      ...Array.from({ length: project.retries + 1 }, (_, retry) => [
+        `${project.name}-invite-admin-${retry}`,
+        `E2E ${project.name} invite admin ${retry}`
+      ]),
+      ...Array.from({ length: project.retries + 1 }, (_, retry) => [
+        `${project.name}-invitee-${retry}`,
+        `E2E ${project.name} invitee ${retry}`
       ])
     ] as const
     for (const [identityKey, name] of identities) {

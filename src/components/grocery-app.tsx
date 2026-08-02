@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from '../auth'
 import { api, ApiError, isProductConflict } from '../lib/api'
+import { supabase } from '../lib/supabase'
 import {
   duplicateSignature,
   normalizeNameForStorage,
@@ -64,6 +65,7 @@ export function GroceryApp() {
   const [realtime, setRealtime] = useState('connecting')
   const [showConnectionWarning, setShowConnectionWarning] = useState(false)
   const mutationCoordinator = useRef(new ProductMutationCoordinator())
+  const previousPendingCount = useRef<number | undefined>(undefined)
   const [mutationState, setMutationState] = useState<ProductMutationState>({
     productIds: new Set(),
     bulk: false
@@ -79,6 +81,13 @@ export function GroceryApp() {
     retry: 1,
     staleTime: 0,
     gcTime: 0
+  })
+  const pendingRequests = useQuery({
+    queryKey: ['household-requests', householdId],
+    queryFn: () => api.household.pendingRequests(householdId!),
+    enabled: Boolean(householdId && auth.profile?.role === 'admin'),
+    retry: 1,
+    staleTime: 0
   })
   const connectionWarningEligible =
     !products.isLoading && !products.isError && (!online || realtime === 'disconnected')
@@ -121,6 +130,35 @@ export function GroceryApp() {
     const timeout = window.setTimeout(() => setToast(''), 3200)
     return () => window.clearTimeout(timeout)
   }, [toast])
+
+  useEffect(() => {
+    const count = pendingRequests.data?.length
+    if (count === undefined) return
+    if (previousPendingCount.current !== undefined && count > previousPendingCount.current) {
+      setToast(t('newRequestNotification'))
+    }
+    previousPendingCount.current = count
+  }, [pendingRequests.data?.length, t])
+
+  useEffect(() => {
+    if (!householdId || auth.profile?.role !== 'admin') return
+    const channel = supabase
+      .channel(`household-join-requests:${householdId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'household_join_requests',
+          filter: `household_id=eq.${householdId}`
+        },
+        () => void client.invalidateQueries({ queryKey: ['household-requests', householdId] })
+      )
+      .subscribe()
+    return () => {
+      void channel.unsubscribe()
+    }
+  }, [auth.profile?.role, client, householdId])
 
   useEffect(() => {
     if (!householdId) return
@@ -437,7 +475,10 @@ export function GroceryApp() {
 
   return (
     <main className="app-shell">
-      <AppHeader onAdmin={() => setAdminOpen(true)} />
+      <AppHeader
+        onAdmin={() => setAdminOpen(true)}
+        pendingRequestCount={pendingRequests.data?.length ?? 0}
+      />
       <section className="list-surface">
         <div className="list-toolbar">
           <div className="search-shell">
@@ -672,7 +713,13 @@ function AppToast({ message }: { message: string }) {
   )
 }
 
-function AppHeader({ onAdmin }: { onAdmin(): void }) {
+function AppHeader({
+  onAdmin,
+  pendingRequestCount
+}: {
+  onAdmin(): void
+  pendingRequestCount: number
+}) {
   const { t, i18n } = useTranslation()
   const auth = useAuth()
   return (
@@ -683,8 +730,17 @@ function AppHeader({ onAdmin }: { onAdmin(): void }) {
       </div>
       <nav>
         {auth.profile?.role === 'admin' && (
-          <button className="icon-button" onClick={onAdmin} aria-label={t('admin')}>
+          <button
+            className="icon-button admin-menu-button"
+            onClick={onAdmin}
+            aria-label={t('admin')}
+          >
             <UsersThree />
+            {pendingRequestCount > 0 && (
+              <span className="admin-pending-badge" aria-label={`${pendingRequestCount}`}>
+                {pendingRequestCount}
+              </span>
+            )}
           </button>
         )}
         <button

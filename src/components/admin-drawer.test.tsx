@@ -34,7 +34,7 @@ function renderDrawer(
 }
 
 describe('AdminDrawer', () => {
-  it('requires a display name when creating a user and lists it above the email', async () => {
+  it('does not expose the service-role create-user flow', async () => {
     const user = userEvent.setup()
     vi.spyOn(api.admin, 'list').mockResolvedValue([
       {
@@ -45,37 +45,21 @@ describe('AdminDrawer', () => {
         createdAt: '2026-07-14T12:00:00.000Z'
       }
     ])
-    const create = vi.spyOn(api.admin, 'create').mockResolvedValue({
-      user: {
-        id: 'new-member-id',
-        name: 'Noa',
-        email: 'noa@example.com',
-        role: 'member',
-        createdAt: '2026-07-14T13:00:00.000Z'
-      }
+    vi.spyOn(api.household, 'pendingRequests').mockResolvedValue([])
+    const invite = vi.spyOn(api.household, 'invite').mockResolvedValue({
+      token: 'invite-token',
+      expiresAt: '2026-08-03T12:00:00.000Z'
     })
 
     const client = renderDrawer()
 
-    const name = screen.getByRole('textbox', { name: 'Name' })
-    expect(name).toBeRequired()
-    expect(name).toHaveAttribute('maxlength', '80')
     expect(await screen.findByText('Dana')).toBeVisible()
     expect(screen.getByText('dana@example.com')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Create user' })).toHaveAttribute(
-      'data-slot',
-      'button'
-    )
-
-    await user.type(name, 'Noa')
-    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'noa@example.com')
-    await user.type(screen.getByLabelText('Password'), 'password123')
-    await user.click(screen.getByRole('button', { name: 'Create user' }))
-
-    await waitFor(() =>
-      expect(create).toHaveBeenCalledWith('Noa', 'noa@example.com', 'password123')
-    )
+    expect(screen.queryByRole('button', { name: 'Create user' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Password' })).not.toBeInTheDocument()
     expect(client.getQueryData(['admin-users'])).toBeUndefined()
+    await user.click(screen.getByRole('button', { name: 'Generate invite link' }))
+    await waitFor(() => expect(invite).toHaveBeenCalledOnce())
   })
 
   it('does not reuse a member list cached for another household', async () => {
@@ -103,6 +87,7 @@ describe('AdminDrawer', () => {
         createdAt: '2026-07-14T12:00:00.000Z'
       }
     ])
+    vi.spyOn(api.household, 'pendingRequests').mockResolvedValue([])
 
     renderDrawer(client)
 

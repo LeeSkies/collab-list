@@ -28,6 +28,109 @@ export type Database = {
   }
   public: {
     Tables: {
+      household_invites: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          household_id: string
+          id: string
+          revoked_at: string | null
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at: string
+          household_id: string
+          id?: string
+          revoked_at?: string | null
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          household_id?: string
+          id?: string
+          revoked_at?: string | null
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'household_invites_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'household_invites_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: false
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      household_join_requests: {
+        Row: {
+          created_at: string
+          expires_at: string
+          handled_at: string | null
+          household_id: string
+          id: string
+          invite_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          handled_at?: string | null
+          household_id: string
+          id?: string
+          invite_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          handled_at?: string | null
+          household_id?: string
+          id?: string
+          invite_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'household_join_requests_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: false
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'household_join_requests_invite_id_fkey'
+            columns: ['invite_id']
+            isOneToOne: false
+            referencedRelation: 'household_invites'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'household_join_requests_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       household_members: {
         Row: {
           created_at: string
@@ -255,6 +358,13 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      approve_household_request: {
+        Args: { p_request_id: string }
+        Returns: {
+          request_id: string
+          status: string
+        }[]
+      }
       create_household_with_trial: {
         Args: never
         Returns: {
@@ -291,16 +401,68 @@ export type Database = {
         }
       }
       current_household_id: { Args: never; Returns: string }
+      current_household_invite_request: {
+        Args: { p_token: string }
+        Returns: {
+          expires_at: string
+          household_name: string
+          status: string
+        }[]
+      }
       delete_product: {
         Args: { p_expected_version: number; p_product_id: string }
         Returns: boolean
+      }
+      expire_household_join_requests: {
+        Args: { p_household_id: string }
+        Returns: undefined
+      }
+      invite_household_member: {
+        Args: never
+        Returns: {
+          expires_at: string
+          invite_token: string
+        }[]
       }
       is_household_member: {
         Args: { p_household_id: string }
         Returns: boolean
       }
+      list_pending_household_requests: {
+        Args: { p_household_id: string }
+        Returns: {
+          email: string
+          expires_at: string
+          name: string
+          request_id: string
+          requested_at: string
+        }[]
+      }
       normalize_product_name: { Args: { input: string }; Returns: string }
+      preview_household_invite: {
+        Args: { p_token: string }
+        Returns: {
+          approval_required: boolean
+          household_name: string
+        }[]
+      }
       product_name_signature: { Args: { input: string }; Returns: string }
+      reject_household_request: {
+        Args: { p_request_id: string }
+        Returns: {
+          request_id: string
+          status: string
+        }[]
+      }
+      request_household_access: {
+        Args: { p_token: string }
+        Returns: {
+          expires_at: string
+          household_name: string
+          request_id: string
+          status: string
+        }[]
+      }
       require_authenticated: { Args: never; Returns: string }
       require_household_membership: { Args: never; Returns: string }
       restore_all_products: {

@@ -8,7 +8,7 @@ const { channel, from, rpc } = vi.hoisted(() => ({
 
 vi.mock('./supabase', () => ({ supabase: { channel, from, rpc } }))
 
-import { api, ApiError, isProductConflict } from './api'
+import { api, ApiError, isApiErrorCode, isProductConflict } from './api'
 
 describe('household.create', () => {
   beforeEach(() => rpc.mockReset())
@@ -163,6 +163,24 @@ describe('realtime subscription', () => {
       },
       expect.any(Function)
     )
+  })
+})
+
+describe('isApiErrorCode', () => {
+  it('matches both Postgres SQLSTATE and the RPC message', () => {
+    expect(
+      isApiErrorCode(
+        new ApiError('42501', 'email_confirmation_required'),
+        'email_confirmation_required'
+      )
+    ).toBe(true)
+    expect(
+      isApiErrorCode(
+        new ApiError('P0001', 'household_capacity_reached'),
+        'household_capacity_reached'
+      )
+    ).toBe(true)
+    expect(isApiErrorCode(new ApiError('P0001', 'other'), 'household_capacity_reached')).toBe(false)
   })
 })
 

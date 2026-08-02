@@ -12,6 +12,7 @@ export const Route = createFileRoute('/')({ component: Home })
 function Home() {
   const auth = useAuth()
   const [createRequested, setCreateRequested] = useState(false)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
   const isInvitePath = window.location.pathname.startsWith('/invite/')
   if (!isSupabaseConfigured)
     return (
@@ -30,12 +31,23 @@ function Home() {
       </main>
     )
   if (auth.session) {
-    if (auth.profile) return <GroceryApp />
+    if (auth.profile?.household_id && !onboardingOpen) return <GroceryApp />
     if (isInvitePath) return <LoginForm showCreateHousehold={false} inviteMode />
-    return <CreateHouseholdOnboarding />
+    return (
+      <CreateHouseholdOnboarding
+        onHouseholdCreated={() => setOnboardingOpen(true)}
+        onContinueToList={() => setOnboardingOpen(false)}
+      />
+    )
   }
   if (createRequested && !isInvitePath)
-    return <CreateHouseholdOnboarding onBack={() => setCreateRequested(false)} />
+    return (
+      <CreateHouseholdOnboarding
+        onBack={() => setCreateRequested(false)}
+        onHouseholdCreated={() => setOnboardingOpen(true)}
+        onContinueToList={() => setOnboardingOpen(false)}
+      />
+    )
   return (
     <LoginForm
       onCreateHousehold={() => setCreateRequested(true)}

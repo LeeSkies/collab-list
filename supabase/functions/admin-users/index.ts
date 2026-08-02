@@ -68,43 +68,6 @@ Deno.serve(async (request) => {
         })
       })
     }
-    if (body.action === 'create') {
-      if (
-        typeof body.name !== 'string' ||
-        body.name.trim().length < 1 ||
-        body.name.trim().length > 80 ||
-        typeof body.email !== 'string' ||
-        typeof body.password !== 'string' ||
-        body.password.length < 8
-      )
-        return json({ error: 'Valid name, email, and password are required' }, 400)
-      const { data, error } = await admin.auth.admin.createUser({
-        email: body.email.trim().toLowerCase(),
-        password: body.password,
-        email_confirm: true,
-        user_metadata: { name: body.name.trim() }
-      })
-      if (error) return json({ error: 'Could not create user', code: error.code }, 400)
-      const { error: memberError } = await admin
-        .from('household_members')
-        .insert({ household_id: householdId, user_id: data.user.id, role: 'member' })
-      if (memberError) {
-        await admin.auth.admin.deleteUser(data.user.id)
-        return json({ error: 'Could not add user to household', code: memberError.code }, 400)
-      }
-      return json(
-        {
-          user: {
-            id: data.user.id,
-            name: body.name.trim(),
-            email: data.user.email,
-            role: 'member',
-            createdAt: data.user.created_at
-          }
-        },
-        201
-      )
-    }
     if (body.action === 'delete') {
       if (body.userId === auth.user.id)
         return json({ error: 'You cannot remove yourself from the household' }, 400)

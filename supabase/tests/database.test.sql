@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(98);
+select plan(121);
 
 select has_table('public', 'products', 'products exists');
 select has_table('public', 'households', 'households exist');
@@ -364,6 +364,155 @@ set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000004';
 select is((select count(*) from public.household_trials), 1::bigint, 'household members can read their household trial');
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
 select is((select count(*) from public.household_trials), 0::bigint, 'household trial RLS hides other household trials');
+
+-- Invite links expose only the shaped public preview, and rotation revokes
+-- the previous raw token.
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+create temp table first_invite as select * from public.invite_household_member();
+select isnt((select invite_token from first_invite), null, 'admin can generate an invite token');
+select is((select length(invite_token) from first_invite), 64, 'invite tokens have sufficient entropy');
+create temp table second_invite as select * from public.invite_household_member();
+select set_config('test.invite_first', (select invite_token from first_invite), true);
+select set_config('test.invite_second', (select invite_token from second_invite), true);
+set local role anon;
+select is(
+  (select count(*) from public.preview_household_invite(current_setting('test.invite_first'))),
+  0::bigint,
+  'rotating an invite revokes the previous token'
+);
+select is(
+  (select count(*) from public.preview_household_invite(current_setting('test.invite_second'))),
+  1::bigint,
+  'anonymous preview accepts the active invite token'
+);
+select throws_ok(
+  $$ select token_hash from public.household_invites $$,
+  '42501',
+  'permission denied for table household_invites',
+  'anonymous preview cannot read invite hashes'
+);
+set local role postgres;
+update public.household_invites
+set created_at = now() - interval '2 minutes',
+    expires_at = now() - interval '1 minute'
+where token_hash = extensions.digest(
+  convert_to(current_setting('test.invite_second'), 'UTF8'), 'sha256'
+);
+set local role anon;
+select is(
+  (select count(*) from public.preview_household_invite(current_setting('test.invite_second'))),
+  0::bigint,
+  'expired invite links are not previewable'
+);
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+create temp table active_invite as select * from public.invite_household_member();
+
+-- Add verified, unassigned accounts for request/capacity coverage.
+set local role postgres;
+do $$
+declare
+  template_user auth.users;
+  new_id uuid;
+  suffix integer;
+begin
+  select * into template_user from auth.users where id = '10000000-0000-0000-0000-000000000001'::uuid;
+  for suffix in 9..13 loop
+    new_id := format('10000000-0000-0000-0000-%s', lpad(suffix::text, 12, '0'))::uuid;
+    insert into auth.users (
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      confirmation_token, recovery_token, email_change_token_new, email_change,
+      email_change_token_current, phone_change_token, reauthentication_token,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+    ) values (
+      template_user.instance_id, new_id, template_user.aud, template_user.role,
+      format('invitee%s@example.com', suffix), template_user.encrypted_password,
+      template_user.email_confirmed_at, template_user.confirmation_token,
+      template_user.recovery_token, template_user.email_change_token_new,
+      template_user.email_change, template_user.email_change_token_current,
+      template_user.phone_change_token, template_user.reauthentication_token,
+      template_user.raw_app_meta_data, jsonb_build_object('name', format('Invitee %s', suffix)),
+      now(), now()
+    );
+  end loop;
+end
+$$;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000009';
+create temp table first_request as
+select * from public.request_household_access((select invite_token from active_invite));
+select is((select status from first_request), 'pending', 'verified invitee can request access');
+select is(
+  (select expires_at - now() > interval '6 days' from first_request),
+  true,
+  'join requests expire seven days after creation'
+);
+create temp table duplicate_request as
+select * from public.request_household_access((select invite_token from active_invite));
+select is(
+  (select request_id from duplicate_request),
+  (select request_id from first_request),
+  'reopening a pending invite request is idempotent'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000010';
+select lives_ok(
+  $$ select * from public.request_household_access((select invite_token from active_invite)) $$,
+  'second pending request is accepted'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000011';
+select lives_ok(
+  $$ select * from public.request_household_access((select invite_token from active_invite)) $$,
+  'third pending request is accepted within the five-seat limit'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000012';
+select throws_ok(
+  $$ select * from public.request_household_access((select invite_token from active_invite)) $$,
+  'P0001',
+  'household_capacity_reached',
+  'pending requests reserve the remaining member seats'
+);
+set local role postgres;
+update public.household_join_requests
+set created_at = now() - interval '2 minutes',
+    expires_at = now() - interval '1 minute'
+where user_id = '10000000-0000-0000-0000-000000000011'::uuid;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select is(
+  (select count(*) from public.list_pending_household_requests((select household_id from public.household_members where user_id = auth.uid())) where name = 'Invitee 11'),
+  0::bigint,
+  'expired requests release their pending seat'
+);
+select is((select status from public.approve_household_request((select request_id from first_request))), 'approved', 'admin approval adds a member atomically');
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000010';
+select is((select count(*) from public.household_members where user_id = auth.uid()), 0::bigint, 'unapproved invitees have no membership');
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select is((select status from public.approve_household_request((select id from public.household_join_requests where user_id = '10000000-0000-0000-0000-000000000010'::uuid))), 'approved', 'second request can be approved');
+select is((select status from public.approve_household_request((select id from public.household_join_requests where user_id = '10000000-0000-0000-0000-000000000011'::uuid))), 'expired', 'admin cannot approve an expired request');
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000012';
+select lives_ok(
+  $$ select * from public.request_household_access((select invite_token from active_invite)) $$,
+  'released expired seat can be requested again'
+);
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select is((select count(*) from public.household_members where household_id = (select household_id from public.household_members where user_id = auth.uid())), 4::bigint, 'approved members are counted in the household');
+select is((select status from public.reject_household_request((select id from public.household_join_requests where user_id = '10000000-0000-0000-0000-000000000012'::uuid))), 'rejected', 'admin rejection releases a request');
+create temp table fresh_invite as select * from public.invite_household_member();
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000012';
+select is((select status from public.request_household_access((select invite_token from fresh_invite))), 'pending', 'a rejected account can request again with a fresh invite');
+select is((select status from public.current_household_invite_request((select invite_token from fresh_invite))), 'pending', 'request status is scoped to the invite token');
+
+-- The account-level unique membership constraint also blocks joining a second household.
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000004';
+create temp table other_household_invite as select * from public.invite_household_member();
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000009';
+select throws_ok(
+  $$ select * from public.request_household_access((select invite_token from other_household_invite)) $$,
+  '23505',
+  'account_belongs_to_another_household',
+  'an account cannot join another household'
+);
 
 set local role anon;
 select throws_ok(

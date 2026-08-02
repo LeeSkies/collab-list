@@ -201,7 +201,7 @@ describe('AuthProvider profile identity guard', () => {
     expect(screen.getByTestId('identity')).toHaveTextContent('user-a:user-a:household-a')
   })
 
-  it('clears profile and membership state when realtime reports removal', async () => {
+  it('keeps an unassigned profile available after realtime membership removal', async () => {
     const current = session('user-a')
     getSession.mockResolvedValue({ data: { session: current } })
     profileCurrent.mockResolvedValue(profile('user-a'))
@@ -227,7 +227,7 @@ describe('AuthProvider profile identity guard', () => {
 
     act(() => membershipCallback?.())
     await waitFor(() =>
-      expect(screen.getByTestId('identity')).toHaveTextContent('user-a:no-profile:no-household')
+      expect(screen.getByTestId('identity')).toHaveTextContent('user-a:user-a:no-household')
     )
   })
 

@@ -18,7 +18,12 @@ interface AuthValue {
   profile: Profile | null
   restoring: boolean
   signIn(email: string, password: string): Promise<void>
-  signUp(email: string, password: string, name: string): Promise<{ confirmationRequired: boolean }>
+  signUp(
+    email: string,
+    password: string,
+    name: string,
+    redirectTo?: string
+  ): Promise<{ confirmationRequired: boolean }>
   refreshProfile(): Promise<void>
   signOut(): Promise<void>
 }
@@ -66,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(
         membership
           ? { ...profile, household_id: membership.household_id, role: membership.role }
-          : null
+          : { ...profile, household_id: undefined }
       )
       finishRestore(version)
     }
@@ -102,14 +107,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then((membership) => {
           if (!active) return
           setProfile((current) =>
-            current && membership && current.id === authenticatedUserId
-              ? { ...current, household_id: membership.household_id, role: membership.role }
+            current && current.id === authenticatedUserId
+              ? membership
+                ? { ...current, household_id: membership.household_id, role: membership.role }
+                : { ...current, household_id: undefined }
               : current
           )
         })
         .catch(() => {
           if (!active) return
-          setProfile((current) => (current?.id === authenticatedUserId ? null : current))
+          setProfile((current) =>
+            current?.id === authenticatedUserId ? { ...current, household_id: undefined } : current
+          )
         })
     }
     const channel = supabase
@@ -143,13 +152,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
       },
-      async signUp(email, password, name) {
+      async signUp(email, password, name, redirectTo) {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: { name },
-            emailRedirectTo: new URL(import.meta.env.BASE_URL, window.location.origin).toString()
+            emailRedirectTo:
+              redirectTo ?? new URL(import.meta.env.BASE_URL, window.location.origin).toString()
           }
         })
         if (error) throw error
@@ -161,11 +171,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const isCurrentSession = () => sessionRef.current?.user.id === id
         const nextProfile = await api.profile.current(id)
         if (!isCurrentSession()) return
-        const membership = await api.household.current(id)
+        const membership = await api.household.current(id).catch(() => null)
         if (!isCurrentSession()) return
         setProfile((current) =>
           isCurrentSession()
-            ? { ...nextProfile, household_id: membership.household_id, role: membership.role }
+            ? membership
+              ? { ...nextProfile, household_id: membership.household_id, role: membership.role }
+              : { ...nextProfile, household_id: undefined }
             : current
         )
       },

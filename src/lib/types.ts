@@ -59,3 +59,30 @@ export interface AdminUser {
   role: Role
   createdAt: string
 }
+
+export interface HouseholdInvite {
+  token: string
+  expiresAt: string
+}
+
+export interface HouseholdInvitePreview {
+  householdName: string
+  approvalRequired: boolean
+}
+
+export type HouseholdRequestStatus = 'pending' | 'approved' | 'rejected' | 'expired'
+
+export interface HouseholdRequestState {
+  requestId: string | null
+  householdName: string
+  status: HouseholdRequestStatus
+  expiresAt: string | null
+}
+
+export interface PendingHouseholdRequest {
+  requestId: string
+  name: string
+  email: string
+  requestedAt: string
+  expiresAt: string
+}

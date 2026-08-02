@@ -3,7 +3,11 @@ import { supabase } from './supabase'
 import type {
   AdminUser,
   HouseholdCreation,
+  HouseholdInvite,
+  HouseholdInvitePreview,
   HouseholdMembership,
+  HouseholdRequestState,
+  PendingHouseholdRequest,
   Product,
   ProductChanges,
   Profile
@@ -20,6 +24,13 @@ export class ApiError extends Error {
 
 export function isProductConflict(reason: unknown): reason is ApiError {
   return reason instanceof ApiError && (reason.code === 'PT409' || reason.code === '40001')
+}
+
+export function isApiErrorCode(reason: unknown, expected: string): reason is ApiError {
+  return (
+    reason instanceof ApiError &&
+    (reason.code === expected || reason.message === expected || reason.message.includes(expected))
+  )
 }
 
 type SupabaseResult<T> = {
@@ -129,6 +140,90 @@ export const api = {
     create: async () => {
       const rows = await unwrap<HouseholdCreation[]>(supabase.rpc('create_household_with_trial'))
       return rows[0]!
+    },
+    invite: async () => {
+      const rows = await unwrap<Array<{ invite_token: string; expires_at: string }>>(
+        supabase.rpc('invite_household_member')
+      )
+      return {
+        token: rows[0]!.invite_token,
+        expiresAt: rows[0]!.expires_at
+      } satisfies HouseholdInvite
+    },
+    previewInvite: async (token: string) => {
+      const rows = await unwrap<Array<{ household_name: string; approval_required: boolean }>>(
+        supabase.rpc('preview_household_invite', { p_token: token })
+      )
+      const preview = rows[0]
+      if (!preview) throw new ApiError('invite_invalid', 'Invite is invalid or expired')
+      return {
+        householdName: preview.household_name,
+        approvalRequired: preview.approval_required
+      } satisfies HouseholdInvitePreview
+    },
+    requestAccess: async (token: string) => {
+      const rows = await unwrap<
+        Array<{
+          request_id: string | null
+          household_name: string
+          status: HouseholdRequestState['status']
+          expires_at: string | null
+        }>
+      >(supabase.rpc('request_household_access', { p_token: token }))
+      const request = rows[0]!
+      return {
+        requestId: request.request_id,
+        householdName: request.household_name,
+        status: request.status,
+        expiresAt: request.expires_at
+      } satisfies HouseholdRequestState
+    },
+    requestStatus: async (token: string) => {
+      const rows = await unwrap<
+        Array<{
+          household_name: string
+          status: HouseholdRequestState['status']
+          expires_at: string | null
+        }>
+      >(supabase.rpc('current_household_invite_request', { p_token: token }))
+      const request = rows[0]
+      if (!request) throw new ApiError('request_not_found', 'No household request found')
+      return {
+        requestId: null,
+        householdName: request.household_name,
+        status: request.status,
+        expiresAt: request.expires_at
+      } satisfies HouseholdRequestState
+    },
+    pendingRequests: async (householdId: string) => {
+      const rows = await unwrap<
+        Array<{
+          request_id: string
+          name: string
+          email: string
+          requested_at: string
+          expires_at: string
+        }>
+      >(supabase.rpc('list_pending_household_requests', { p_household_id: householdId }))
+      return rows.map((request): PendingHouseholdRequest => ({
+        requestId: request.request_id,
+        name: request.name,
+        email: request.email,
+        requestedAt: request.requested_at,
+        expiresAt: request.expires_at
+      }))
+    },
+    approveRequest: async (requestId: string) => {
+      const rows = await unwrap<Array<{ request_id: string; status: string }>>(
+        supabase.rpc('approve_household_request', { p_request_id: requestId })
+      )
+      return rows[0]!
+    },
+    rejectRequest: async (requestId: string) => {
+      const rows = await unwrap<Array<{ request_id: string; status: string }>>(
+        supabase.rpc('reject_household_request', { p_request_id: requestId })
+      )
+      return rows[0]!
     }
   },
   admin: {
@@ -141,8 +236,6 @@ export const api = {
       return data as T
     },
     list: () => api.admin.invoke<{ users: AdminUser[] }>('list').then((value) => value.users),
-    create: (name: string, email: string, password: string) =>
-      api.admin.invoke<{ user: AdminUser }>('create', { name, email, password }),
     remove: (userId: string) => api.admin.invoke<{ ok: true }>('delete', { userId })
   },
   realtime: {

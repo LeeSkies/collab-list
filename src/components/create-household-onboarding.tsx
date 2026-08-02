@@ -7,11 +7,20 @@ import { Button } from './ui/button'
 
 type Step = 'welcome' | 'signup' | 'confirmation' | 'trial' | 'complete'
 
-export function CreateHouseholdOnboarding({ onBack }: { onBack?: () => void }) {
+export function CreateHouseholdOnboarding({
+  onBack,
+  onHouseholdCreated,
+  onContinueToList
+}: {
+  onBack?: () => void
+  onHouseholdCreated?: () => void
+  onContinueToList?: () => void
+}) {
   const { t } = useTranslation()
   const auth = useAuth()
   const [step, setStep] = useState<Step>(auth.session ? 'trial' : 'welcome')
   const [pending, setPending] = useState(false)
+  const [continueRequested, setContinueRequested] = useState(false)
   const [error, setError] = useState('')
   const [announcement, setAnnouncement] = useState('')
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -24,6 +33,12 @@ export function CreateHouseholdOnboarding({ onBack }: { onBack?: () => void }) {
     heading.focus()
     setAnnouncement(heading.textContent ?? '')
   }, [visibleStep])
+
+  useEffect(() => {
+    if (continueRequested && step === 'complete' && auth.profile?.household_id) {
+      onContinueToList?.()
+    }
+  }, [auth.profile?.household_id, continueRequested, onContinueToList, step])
 
   async function submitSignUp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -48,6 +63,7 @@ export function CreateHouseholdOnboarding({ onBack }: { onBack?: () => void }) {
     setError('')
     try {
       await api.household.create()
+      onHouseholdCreated?.()
       setStep('complete')
     } catch (reason) {
       if (reason instanceof Error && reason.message.includes('email_confirmation_required')) {
@@ -65,6 +81,7 @@ export function CreateHouseholdOnboarding({ onBack }: { onBack?: () => void }) {
     setError('')
     try {
       await auth.refreshProfile()
+      setContinueRequested(true)
     } catch {
       setError(t('refreshProfileError'))
     } finally {
