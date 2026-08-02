@@ -96,10 +96,18 @@ function fixtureHouseholdIds(container: string, userIds: string[]) {
 
 function deleteFixtureHouseholds(container: string, householdIds: string[]) {
   if (householdIds.length === 0) return
+  const ids = sqlUuidList(householdIds)
+  postgresQuery(
+    container,
+    `update public.account_trial_eligibility
+        set owned_household_id = null,
+            owned_trial_started_at = null
+      where owned_household_id in (${ids})`
+  )
   postgresQuery(
     container,
     `delete from public.households
-      where id in (${sqlUuidList(householdIds)})`
+      where id in (${ids})`
   )
 }
 
