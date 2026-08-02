@@ -490,6 +490,13 @@ export type Database = {
       }
       require_authenticated: { Args: never; Returns: string }
       require_household_membership: { Args: never; Returns: string }
+      reset_household: {
+        Args: { p_clear_products: boolean; p_remove_members: boolean }
+        Returns: {
+          members_removed: number
+          products_deleted: number
+        }[]
+      }
       restore_all_products: {
         Args: { p_clear_notes?: boolean; p_reset_quantities?: boolean }
         Returns: {

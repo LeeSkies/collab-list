@@ -262,6 +262,15 @@ export const api = {
         supabase.rpc('reject_household_request', { p_request_id: requestId })
       )
       return rows[0]!
+    },
+    reset: async (clearProducts: boolean, removeMembers: boolean) => {
+      const rows = await unwrap<Array<{ products_deleted: number; members_removed: number }>>(
+        supabase.rpc('reset_household', {
+          p_clear_products: clearProducts,
+          p_remove_members: removeMembers
+        })
+      )
+      return rows[0]!
     }
   },
   realtime: {

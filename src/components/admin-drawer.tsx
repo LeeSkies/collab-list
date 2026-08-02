@@ -7,6 +7,7 @@ import { api } from '../lib/api'
 import type { AdminUser } from '../lib/types'
 import { Button } from './ui/button'
 import { AppDrawer, ConfirmDialog } from './drawer'
+import { ResetHouseholdDialog } from './reset-household-dialog'
 
 export function AdminDrawer({
   open,
@@ -19,6 +20,7 @@ export function AdminDrawer({
   const auth = useAuth()
   const client = useQueryClient()
   const [removeUser, setRemoveUser] = useState<AdminUser | null>(null)
+  const [resetOpen, setResetOpen] = useState(false)
   const [error, setError] = useState('')
   const [inviteLink, setInviteLink] = useState('')
   const [copied, setCopied] = useState(false)
@@ -63,6 +65,23 @@ export function AdminDrawer({
   const remove = useMutation({
     mutationFn: (id: string) => api.household.removeMember(householdId!, id),
     onSuccess: () => client.invalidateQueries({ queryKey: usersQueryKey }),
+    onError: () => setError(t('requestFailed'))
+  })
+  const reset = useMutation({
+    mutationFn: ({
+      clearProducts,
+      removeMembers
+    }: {
+      clearProducts: boolean
+      removeMembers: boolean
+    }) => api.household.reset(clearProducts, removeMembers),
+    onSuccess: (_, { clearProducts }) => {
+      if (clearProducts && householdId) {
+        client.setQueryData(['products', householdId], [])
+      }
+      void client.invalidateQueries({ queryKey: usersQueryKey })
+      void client.invalidateQueries({ queryKey: pendingRequestsKey })
+    },
     onError: () => setError(t('requestFailed'))
   })
 
@@ -159,6 +178,22 @@ export function AdminDrawer({
             <p className="admin-empty">{t('noPendingRequests')}</p>
           )}
         </section>
+        <section className="reset-management">
+          <div className="section-title">
+            <Trash />
+            <strong>{t('resetHousehold')}</strong>
+          </div>
+          <p>{t('resetHouseholdDescription')}</p>
+          <Button
+            type="button"
+            size="lg"
+            variant="destructive"
+            onClick={() => setResetOpen(true)}
+            disabled={reset.isPending}
+          >
+            {t('resetHousehold')}
+          </Button>
+        </section>
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -189,6 +224,12 @@ export function AdminDrawer({
           ))}
         </div>
       </AppDrawer>
+      <ResetHouseholdDialog
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        pending={reset.isPending}
+        onConfirm={(options) => reset.mutate(options)}
+      />
       {removeUser && (
         <ConfirmDialog
           open

@@ -185,7 +185,9 @@ export function ChoiceDialog({
   confirmLabel,
   children,
   onConfirm,
-  pending = false
+  pending = false,
+  confirmDisabled = false,
+  destructive = false
 }: {
   open: boolean
   onOpenChange(open: boolean): void
@@ -195,6 +197,8 @@ export function ChoiceDialog({
   children: ReactNode
   onConfirm(): void
   pending?: boolean
+  confirmDisabled?: boolean
+  destructive?: boolean
 }) {
   const { t } = useTranslation()
   return (
@@ -208,7 +212,11 @@ export function ChoiceDialog({
             <div className="choice-dialog-options">{children}</div>
             <div className="confirm-actions">
               <Dialog.Close className="button secondary">{t('cancel')}</Dialog.Close>
-              <button className="button" disabled={pending} onClick={onConfirm}>
+              <button
+                className={`button${destructive ? ' danger' : ''}`}
+                disabled={pending || confirmDisabled}
+                onClick={onConfirm}
+              >
                 {confirmLabel}
               </button>
             </div>

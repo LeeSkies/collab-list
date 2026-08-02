@@ -65,6 +65,31 @@ describe('AdminDrawer', () => {
     await waitFor(() => expect(invite).toHaveBeenCalledOnce())
   })
 
+  it('requires a choice and explicit confirmation before resetting', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api.household, 'members').mockResolvedValue([])
+    vi.spyOn(api.household, 'pendingRequests').mockResolvedValue([])
+    const reset = vi.spyOn(api.household, 'reset').mockResolvedValue({
+      products_deleted: 2,
+      members_removed: 1
+    })
+
+    renderDrawer()
+
+    const resetButton = await screen.findByRole('button', { name: /^Reset household$/ })
+    await user.click(resetButton)
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+
+    await user.click(screen.getByRole('switch', { name: 'Delete all products and their history' }))
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(screen.getByRole('heading', { name: 'Reset household now?' })).toBeVisible()
+    expect(reset).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Reset now' }))
+    await waitFor(() => expect(reset).toHaveBeenCalledWith(true, false))
+  })
+
   it('does not render admin controls for a regular member', () => {
     authState.profile.role = 'member'
     const members = vi.spyOn(api.household, 'members')

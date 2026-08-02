@@ -1413,7 +1413,8 @@ body::before {
   transform: translateX(-18px);
 }
 .invite-management,
-.pending-requests {
+.pending-requests,
+.reset-management {
   display: grid;
   gap: 12px;
   padding: 16px;
@@ -1421,6 +1422,7 @@ body::before {
   background: var(--muted);
 }
 .invite-management p,
+.reset-management p,
 .admin-empty {
   margin: 0;
   color: var(--muted-foreground);

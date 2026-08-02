@@ -129,6 +129,26 @@ describe('products.restoreAll', () => {
   })
 })
 
+describe('household.reset', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('sends both reset choices to the destructive RPC', async () => {
+    rpc.mockResolvedValue({
+      data: [{ products_deleted: 3, members_removed: 2 }],
+      error: null
+    })
+
+    await expect(api.household.reset(true, false)).resolves.toEqual({
+      products_deleted: 3,
+      members_removed: 2
+    })
+    expect(rpc).toHaveBeenCalledWith('reset_household', {
+      p_clear_products: true,
+      p_remove_members: false
+    })
+  })
+})
+
 describe('products.list', () => {
   it('forwards React Query cancellation to the Supabase request', async () => {
     const abortSignal = vi.fn(
