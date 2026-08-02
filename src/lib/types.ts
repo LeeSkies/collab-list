@@ -8,6 +8,7 @@ export interface Profile {
   name: string
   email: string
   role: Role
+  product_tour_completed_at: string | null
   created_at: string
   updated_at: string
 }

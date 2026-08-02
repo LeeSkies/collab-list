@@ -39,6 +39,7 @@ import { AdminDrawer } from './admin-drawer'
 import { CategoryFilterDrawer } from './category-filter-drawer'
 import { ProductDrawer } from './product-drawer'
 import { ProductSection } from './product-section'
+import { ProductTour } from './product-tour'
 import { RestoreAllDialog } from './restore-all-dialog'
 
 const SORT_MODES: ProductSortMode[] = ['default', 'name', 'category']
@@ -64,6 +65,7 @@ export function GroceryApp() {
   const [online, setOnline] = useState(navigator.onLine)
   const [realtime, setRealtime] = useState('connecting')
   const [showConnectionWarning, setShowConnectionWarning] = useState(false)
+  const [productTourClosed, setProductTourClosed] = useState(false)
   const mutationCoordinator = useRef(new ProductMutationCoordinator())
   const previousPendingCount = useRef<number | undefined>(undefined)
   const [mutationState, setMutationState] = useState<ProductMutationState>({
@@ -88,6 +90,10 @@ export function GroceryApp() {
     enabled: Boolean(householdId && auth.profile?.role === 'admin'),
     retry: 1,
     staleTime: 0
+  })
+  const completeProductTour = useMutation({
+    mutationFn: api.profile.completeProductTour,
+    onSuccess: () => setProductTourClosed(true)
   })
   const connectionWarningEligible =
     !products.isLoading && !products.isError && (!online || realtime === 'disconnected')
@@ -654,6 +660,18 @@ export function GroceryApp() {
       />
       <AppToast message={toast} />
       <PwaUpdate />
+      {auth.profile?.household_id &&
+        auth.profile.product_tour_completed_at === null &&
+        !productTourClosed && (
+          <ProductTour
+            key={`${auth.profile.id}-${auth.profile.household_id}`}
+            role={auth.profile.role}
+            onComplete={async () => {
+              await completeProductTour.mutateAsync()
+              if (auth.refreshProfile) await auth.refreshProfile().catch(() => undefined)
+            }}
+          />
+        )}
     </main>
   )
 }

@@ -13,9 +13,11 @@ import { ProductSection } from './product-section'
 const { authState } = vi.hoisted(() => ({
   authState: {
     profile: {
-      role: 'member' as const,
-      household_id: '20000000-0000-0000-0000-000000000001'
+      role: 'member' as 'admin' | 'member',
+      household_id: '20000000-0000-0000-0000-000000000001',
+      product_tour_completed_at: undefined as string | null | undefined
     },
+    refreshProfile: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn()
   }
 }))
@@ -75,10 +77,12 @@ function buildProductSection(
 afterEach(async () => {
   authState.profile = {
     role: 'member',
-    household_id: '20000000-0000-0000-0000-000000000001'
+    household_id: '20000000-0000-0000-0000-000000000001',
+    product_tour_completed_at: undefined
   }
   localStorage.removeItem('grocery-sort-mode')
   await i18n.changeLanguage('en')
+  authState.refreshProfile.mockReset().mockResolvedValue(undefined)
   vi.restoreAllMocks()
   vi.useRealTimers()
 })
@@ -355,7 +359,11 @@ describe('GroceryApp realtime categories', () => {
       boughtProduct.household_id
     )
 
-    authState.profile = { role: 'member', household_id: secondHouseholdId }
+    authState.profile = {
+      role: 'member',
+      household_id: secondHouseholdId,
+      product_tour_completed_at: undefined
+    }
     view.rerender(
       <QueryClientProvider client={client}>
         <I18nextProvider i18n={i18n}>
@@ -389,6 +397,7 @@ describe('GroceryApp realtime categories', () => {
       name: 'Lee',
       email: 'admin@example.com',
       role: 'admin',
+      product_tour_completed_at: '2026-08-05T12:00:00.000Z',
       created_at: boughtProduct.created_at,
       updated_at: boughtProduct.updated_at
     })
@@ -421,6 +430,89 @@ describe('GroceryApp realtime categories', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Someone changed this product')
     expect(update.mock.calls[0]?.[0].version).toBe(1)
     expect(category).toHaveValue('snacks')
+  })
+})
+
+describe('GroceryApp product tour', () => {
+  it('shows a new member tour after household entry and does not reopen after completion', async () => {
+    const user = userEvent.setup()
+    authState.profile = {
+      role: 'member',
+      household_id: boughtProduct.household_id,
+      product_tour_completed_at: null
+    }
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const completedAt = '2026-08-05T12:00:00.000Z'
+    const complete = vi.spyOn(api.profile, 'completeProductTour').mockImplementation(async () => {
+      authState.profile.product_tour_completed_at = completedAt
+      return completedAt
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Find anything quickly' })).toBeVisible()
+    expect(screen.getByText('Step 1 of 4')).toBeVisible()
+    expect(
+      screen.queryByRole('heading', { name: 'Manage household members' })
+    ).not.toBeInTheDocument()
+    for (let step = 0; step < 4; step += 1) {
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+    }
+    await waitFor(() => expect(complete).toHaveBeenCalledOnce())
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    view.unmount()
+    const nextClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={nextClient}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('gives admins the member-management step', async () => {
+    const user = userEvent.setup()
+    authState.profile = {
+      role: 'admin',
+      household_id: boughtProduct.household_id,
+      product_tour_completed_at: null
+    }
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    for (let step = 0; step < 4; step += 1) {
+      await user.click(await screen.findByRole('button', { name: 'Next' }))
+    }
+    expect(await screen.findByRole('heading', { name: 'Manage household members' })).toBeVisible()
+    expect(screen.getByText('Step 5 of 5')).toBeVisible()
   })
 })
 

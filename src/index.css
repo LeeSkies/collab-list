@@ -397,6 +397,62 @@ body::before {
   line-height: 1.4;
 }
 
+.product-tour-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.product-tour-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(23 31 25 / 0.58);
+}
+.product-tour-dialog {
+  position: relative;
+  display: grid;
+  width: min(420px, 100%);
+  gap: 12px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: 0 18px 60px rgb(22 34 25 / 0.22);
+}
+.product-tour-eyebrow {
+  margin: 0;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.product-tour-step {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 700;
+}
+.product-tour-dialog h2 {
+  margin: 4px 0 0;
+  font-size: clamp(24px, 7vw, 32px);
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+.product-tour-dialog > p:not(.product-tour-eyebrow):not(.product-tour-step):not(.form-error) {
+  margin: 0;
+  color: var(--muted-foreground);
+  line-height: 1.55;
+}
+.product-tour-next {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+}
+
 .app-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

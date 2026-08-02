@@ -302,6 +302,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          product_tour_completed_at: string | null
           role: string
           updated_at: string
         }
@@ -310,6 +311,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          product_tour_completed_at?: string | null
           role?: string
           updated_at?: string
         }
@@ -318,6 +320,7 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          product_tour_completed_at?: string | null
           role?: string
           updated_at?: string
         }
@@ -363,6 +366,12 @@ export type Database = {
         Returns: {
           request_id: string
           status: string
+        }[]
+      }
+      complete_product_tour: {
+        Args: never
+        Returns: {
+          product_tour_completed_at: string
         }[]
       }
       create_household_with_trial: {

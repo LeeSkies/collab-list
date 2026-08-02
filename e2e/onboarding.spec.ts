@@ -23,6 +23,19 @@ function identityForInviteTest(projectName: string, role: 'admin' | 'invitee', r
   return identity
 }
 
+async function completeProductTour(page: import('@playwright/test').Page) {
+  const next = page.getByRole('button', { name: /next|הבא/i })
+  await expect(next).toBeVisible()
+  expect(await page.getByRole('button', { name: /skip|דלג/i }).count()).toBe(0)
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const stepText = await page.locator('.product-tour-step').textContent()
+    const match = stepText?.match(/(\d+)\s+(?:of|מתוך)\s+(\d+)/i)
+    await next.click()
+    if (match && match[1] === match[2]) break
+  }
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+}
+
 test('offers sign in or create household and explains the shared list', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('button', { name: /sign in|כניסה/i })).toBeVisible()
@@ -73,6 +86,7 @@ test('a verified unassigned account can explicitly create its household and tria
     page.getByRole('heading', { name: /your household is ready|משק הבית מוכן/i })
   ).toBeVisible()
   await page.getByRole('button', { name: /continue to list|המשך לרשימה/i }).click()
+  await completeProductTour(page)
   await expect(
     page.getByRole('textbox', { name: /find or add a product|חיפוש או הוספת מוצר/i })
   ).toBeVisible()
@@ -102,6 +116,7 @@ test('an invitee can request access and be approved by the household admin', asy
     .getByRole('button', { name: /create household and start trial|יצירת משק הבית/i })
     .click()
   await page.getByRole('button', { name: /continue to list|המשך לרשימה/i }).click()
+  await completeProductTour(page)
   await expect(
     page.getByRole('textbox', { name: /find or add a product|חיפוש או הוספת מוצר/i })
   ).toBeVisible()
@@ -128,6 +143,7 @@ test('an invitee can request access and be approved by the household admin', asy
 
     await expect(page.getByText(invitee.email)).toBeVisible()
     await page.getByRole('button', { name: /approve|אישור/i }).click()
+    await completeProductTour(inviteePage)
     await expect(
       inviteePage.getByRole('textbox', { name: /find or add a product|חיפוש או הוספת מוצר/i })
     ).toBeVisible()

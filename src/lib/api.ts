@@ -148,7 +148,13 @@ export const api = {
   },
   profile: {
     current: (id: string) =>
-      unwrap<Profile>(supabase.from('profiles').select('*').eq('id', id).single())
+      unwrap<Profile>(supabase.from('profiles').select('*').eq('id', id).single()),
+    completeProductTour: async () => {
+      const rows = await unwrap<Array<{ product_tour_completed_at: string }>>(
+        supabase.rpc('complete_product_tour')
+      )
+      return rows[0]!.product_tour_completed_at
+    }
   },
   household: {
     current: (userId: string) =>

@@ -10,6 +10,20 @@ vi.mock('./supabase', () => ({ supabase: { channel, from, rpc } }))
 
 import { api, ApiError, isApiErrorCode, isProductConflict } from './api'
 
+describe('profile.completeProductTour', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('marks the authenticated profile complete through the scoped RPC', async () => {
+    rpc.mockResolvedValue({
+      data: [{ product_tour_completed_at: '2026-08-05T12:00:00.000Z' }],
+      error: null
+    })
+
+    await expect(api.profile.completeProductTour()).resolves.toBe('2026-08-05T12:00:00.000Z')
+    expect(rpc).toHaveBeenCalledWith('complete_product_tour')
+  })
+})
+
 describe('household.create', () => {
   beforeEach(() => rpc.mockReset())
 

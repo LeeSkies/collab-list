@@ -32,6 +32,7 @@ function renderDrawer(onSave = vi.fn().mockResolvedValue(undefined)) {
     name: 'Lee',
     email: 'admin@example.com',
     role: 'admin',
+    product_tour_completed_at: '2026-08-05T12:00:00.000Z',
     created_at: '2026-07-13T11:00:00.000Z',
     updated_at: '2026-07-13T11:00:00.000Z'
   })

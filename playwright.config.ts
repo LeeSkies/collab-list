@@ -7,6 +7,7 @@ export default defineConfig({
   fullyParallel: false,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'github' : 'list',
+  expect: { timeout: 10_000 },
   use: { baseURL: 'http://127.0.0.1:5173', trace: 'on-first-retry', screenshot: 'only-on-failure' },
   webServer: {
     command: [
@@ -16,6 +17,7 @@ export default defineConfig({
       'VITE_SUPABASE_URL="$API_URL" VITE_SUPABASE_PUBLISHABLE_KEY="$ANON_KEY" npm run dev -- --host 127.0.0.1'
     ].join(' && '),
     url: 'http://127.0.0.1:5173',
+    timeout: 120_000,
     reuseExistingServer: false
   },
   projects: [

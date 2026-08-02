@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(135);
+select plan(141);
 
 select has_table('public', 'products', 'products exists');
 select has_table('public', 'households', 'households exist');
@@ -17,6 +17,20 @@ select is(
 select hasnt_table('public', 'product_pick_history', 'history table was removed');
 select has_table('public', 'profiles', 'profiles exists');
 select has_column('public', 'profiles', 'name', 'profiles have display names');
+select has_column('public', 'profiles', 'product_tour_completed_at', 'profiles track product tour completion');
+select is(
+  (select count(*) from public.profiles where product_tour_completed_at is null),
+  0::bigint,
+  'profiles that existed before the tour are backfilled as complete'
+);
+set local role anon;
+select throws_ok(
+  $$ select * from public.complete_product_tour() $$,
+  '42501',
+  'permission denied for function complete_product_tour',
+  'only authenticated accounts can complete the product tour'
+);
+set local role postgres;
 select col_not_null('public', 'profiles', 'name', 'profile names are required');
 select is((select name from public.profiles where email = 'admin@example.com'), 'Local Admin', 'new-user trigger stores the supplied display name');
 select throws_ok($$ update public.profiles set name = '' where email = 'admin@example.com' $$, '23514', null, 'blank profile names are rejected');
@@ -438,8 +452,25 @@ begin
   end loop;
 end
 $$;
+select is(
+  (select product_tour_completed_at is null from public.profiles where email = 'invitee9@example.com'),
+  true,
+  'accounts created after the tour migration start incomplete'
+);
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000009';
+create temp table first_tour_completion as select * from public.complete_product_tour();
+select is(
+  (select product_tour_completed_at is not null from first_tour_completion),
+  true,
+  'the authenticated account can complete the product tour'
+);
+create temp table second_tour_completion as select * from public.complete_product_tour();
+select is(
+  (select product_tour_completed_at from second_tour_completion),
+  (select product_tour_completed_at from first_tour_completion),
+  'product tour completion is idempotent for the account'
+);
 create temp table first_request as
 select * from public.request_household_access((select invite_token from active_invite));
 select is((select status from first_request), 'pending', 'verified invitee can request access');

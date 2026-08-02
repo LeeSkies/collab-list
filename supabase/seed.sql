@@ -12,6 +12,9 @@ values
 on conflict (provider_id, provider) do nothing;
 
 update public.profiles set role = 'admin' where email = 'admin@example.com';
+update public.profiles
+set product_tour_completed_at = coalesce(product_tour_completed_at, now())
+where email in ('admin@example.com', 'member@example.com');
 
 insert into public.households(name)
 select 'Local household'
