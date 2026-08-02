@@ -545,6 +545,17 @@ body::before {
   background: var(--accent);
 }
 
+.entitlement-banner {
+  margin: 0 18px 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--background));
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .list-surface {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

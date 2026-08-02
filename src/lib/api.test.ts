@@ -48,6 +48,36 @@ describe('household.create', () => {
   })
 })
 
+describe('household.entitlement', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('reads the authoritative access state and fixed seat allowance', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          household_id: 'household-id',
+          access_state: 'read_only_grace',
+          trial_starts_at: '2026-08-01T00:00:00Z',
+          trial_ends_at: '2026-08-15T00:00:00Z',
+          grace_ends_at: '2026-08-22T00:00:00Z',
+          seat_limit: 5,
+          enforcement_enabled: true,
+          can_mutate: false,
+          reads_available: true
+        }
+      ],
+      error: null
+    })
+
+    await expect(api.household.entitlement()).resolves.toMatchObject({
+      access_state: 'read_only_grace',
+      seat_limit: 5,
+      reads_available: true
+    })
+    expect(rpc).toHaveBeenCalledWith('current_household_entitlement')
+  })
+})
+
 describe('products.update', () => {
   beforeEach(() => {
     channel.mockReset()

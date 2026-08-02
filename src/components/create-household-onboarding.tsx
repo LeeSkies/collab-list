@@ -68,6 +68,8 @@ export function CreateHouseholdOnboarding({
     } catch (reason) {
       if (reason instanceof Error && reason.message.includes('email_confirmation_required')) {
         setError(t('emailConfirmationRequired'))
+      } else if (reason instanceof Error && reason.message.includes('trial_eligibility_consumed')) {
+        setError(t('trialEligibilityConsumed'))
       } else {
         setError(t('createHouseholdError'))
       }

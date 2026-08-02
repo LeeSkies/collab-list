@@ -90,6 +90,7 @@ const resources = {
       creatingHousehold: 'Creating household…',
       emailConfirmationRequired: 'Please confirm your email before creating a household.',
       createHouseholdError: 'We could not create your household. Please try again.',
+      trialEligibilityConsumed: 'This account has already used its household trial eligibility.',
       householdCreated: 'Ready to shop',
       householdCreatedTitle: 'Your household is ready',
       householdCreatedBody: 'Your shared grocery list is ready to use.',
@@ -160,6 +161,10 @@ const resources = {
       requestFailed: 'That didn’t work. Your input is safe—please try again.',
       timeout: 'The request took too long. Please try again.',
       offline: 'You’re offline. Reconnect to load or change the list.',
+      householdReadOnly:
+        'Your trial has ended. The list is available to read during the seven-day grace period.',
+      householdLocked:
+        'Your trial has ended. The list remains available to read, but changes are unavailable.',
       reconnecting: 'Connection lost. Reconnecting…',
       connected: 'Back online. List refreshed.',
       createdAt: 'Created',
@@ -285,6 +290,7 @@ const resources = {
       creatingHousehold: 'יוצר משק בית…',
       emailConfirmationRequired: 'יש לאשר את האימייל לפני יצירת משק בית.',
       createHouseholdError: 'לא הצלחנו ליצור את משק הבית. נסו שוב.',
+      trialEligibilityConsumed: 'החשבון הזה כבר מימש את הזכאות לתקופת ניסיון של משק בית.',
       householdCreated: 'מוכנים לקניות',
       householdCreatedTitle: 'משק הבית מוכן',
       householdCreatedBody: 'רשימת הקניות המשותפת מוכנה לשימוש.',
@@ -353,6 +359,9 @@ const resources = {
       requestFailed: 'הפעולה לא הצליחה. הקלט נשמר ואפשר לנסות שוב.',
       timeout: 'הבקשה ארכה יותר מדי. נסו שוב.',
       offline: 'אין חיבור לרשת. התחברו מחדש כדי לטעון או לשנות את הרשימה.',
+      householdReadOnly:
+        'תקופת הניסיון הסתיימה. הרשימה זמינה לקריאה במהלך תקופת החסד בת שבעת הימים.',
+      householdLocked: 'תקופת הניסיון הסתיימה. הרשימה נשארת זמינה לקריאה, אך אי אפשר לבצע שינויים.',
       reconnecting: 'החיבור נותק. מתחברים מחדש…',
       connected: 'חזרנו לרשת. הרשימה עודכנה.',
       createdAt: 'נוצר',

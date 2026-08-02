@@ -28,6 +28,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_trial_eligibility: {
+        Row: {
+          created_at: string
+          eligibility_consumed_at: string | null
+          exposure_days: number
+          owned_household_id: string | null
+          owned_trial_started_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          eligibility_consumed_at?: string | null
+          exposure_days?: number
+          owned_household_id?: string | null
+          owned_trial_started_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          eligibility_consumed_at?: string | null
+          exposure_days?: number
+          owned_household_id?: string | null
+          owned_trial_started_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'account_trial_eligibility_owned_household_id_fkey'
+            columns: ['owned_household_id']
+            isOneToOne: false
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'account_trial_eligibility_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: true
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      feature_flags: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      household_entitlements: {
+        Row: {
+          created_at: string
+          entitlement_plan: string
+          household_id: string
+          seat_limit: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entitlement_plan?: string
+          household_id: string
+          seat_limit?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entitlement_plan?: string
+          household_id?: string
+          seat_limit?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'household_entitlements_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: true
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       household_invites: {
         Row: {
           created_at: string
@@ -124,6 +222,48 @@ export type Database = {
           },
           {
             foreignKeyName: 'household_join_requests_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      household_member_intervals: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          household_id: string
+          id: number
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          household_id: string
+          id?: never
+          started_at: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          household_id?: string
+          id?: never
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'household_member_intervals_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: false
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'household_member_intervals_user_id_fkey'
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'profiles'
@@ -368,6 +508,10 @@ export type Database = {
           status: string
         }[]
       }
+      claim_owned_household_trial: {
+        Args: { p_household_id: string; p_starts_at: string }
+        Returns: undefined
+      }
       complete_product_tour: {
         Args: never
         Returns: {
@@ -409,6 +553,20 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      current_household_entitlement: {
+        Args: never
+        Returns: {
+          access_state: string
+          can_mutate: boolean
+          enforcement_enabled: boolean
+          grace_ends_at: string
+          household_id: string
+          reads_available: boolean
+          seat_limit: number
+          trial_ends_at: string
+          trial_starts_at: string
+        }[]
+      }
       current_household_id: { Args: never; Returns: string }
       current_household_invite_request: {
         Args: { p_token: string }
@@ -422,9 +580,24 @@ export type Database = {
         Args: { p_expected_version: number; p_product_id: string }
         Returns: boolean
       }
+      entitlement_enforcement_enabled: { Args: never; Returns: boolean }
       expire_household_join_requests: {
         Args: { p_household_id: string }
         Returns: undefined
+      }
+      household_entitlement_for: {
+        Args: { p_household_id: string }
+        Returns: {
+          access_state: string
+          can_mutate: boolean
+          enforcement_enabled: boolean
+          grace_ends_at: string
+          household_id: string
+          reads_available: boolean
+          seat_limit: number
+          trial_ends_at: string
+          trial_starts_at: string
+        }[]
       }
       invite_household_member: {
         Args: never
@@ -489,7 +662,15 @@ export type Database = {
         }[]
       }
       require_authenticated: { Args: never; Returns: string }
+      require_household_entitlement_state: {
+        Args: { p_household_id: string }
+        Returns: string
+      }
       require_household_membership: { Args: never; Returns: string }
+      require_household_mutation_access: {
+        Args: { p_household_id: string }
+        Returns: string
+      }
       reset_household: {
         Args: { p_clear_products: boolean; p_remove_members: boolean }
         Returns: {
@@ -522,6 +703,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      sync_account_trial_eligibility: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       toggle_product_picked: {
         Args: {

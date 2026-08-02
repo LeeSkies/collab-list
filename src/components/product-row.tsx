@@ -13,6 +13,7 @@ interface ProductRowProps {
   animateChanges?: boolean
   onEntranceComplete?(): void
   busy?: boolean
+  canMutate?: boolean
   onEdit(): void
   onAdjust(delta: 1 | -1): void
   onToggle(): void
@@ -26,6 +27,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
     animateChanges = true,
     onEntranceComplete,
     busy = false,
+    canMutate = true,
     onEdit,
     onAdjust,
     onToggle
@@ -71,12 +73,20 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
         {...holdTargetProps}
         className={`product-row ${product.is_picked ? 'is-picked' : ''}`}
         style={{ x, opacity }}
-        drag={reduced || busy ? false : 'x'}
+        drag={reduced || busy || !canMutate ? false : 'x'}
         dragConstraints={{ left: direction < 0 ? -104 : 0, right: direction > 0 ? 104 : 0 }}
         dragElastic={0.08}
         dragMomentum={false}
         onDrag={(_, info) => setCrossed(info.offset.x * direction >= 76)}
         onDragEnd={(_, info) => {
+          if (!canMutate) {
+            setCrossed(false)
+            void Promise.all([
+              animate(x, 0, { type: 'spring', duration: 0.25, bounce: 0 }),
+              animate(opacity, 1, { duration: 0.15, ease: [0.2, 0, 0, 1] })
+            ])
+            return
+          }
           if (info.offset.x * direction >= 76) {
             setCrossed(false)
             void Promise.all([
@@ -104,7 +114,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
         <button
           className="product-main"
           onClick={onEdit}
-          disabled={busy}
+          disabled={busy || !canMutate}
           aria-label={t('edit', { name: product.name })}
         >
           <strong>
@@ -119,6 +129,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
             value={product.quantity}
             readOnly
             onClick={onEdit}
+            disabled={!canMutate}
             onPointerDown={(event) => event.stopPropagation()}
             onContextMenu={(event) => event.stopPropagation()}
           />
@@ -130,7 +141,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
           >
             <button
               aria-label={t('minus')}
-              disabled={busy || !quantityCanAdjust(product.quantity, -1)}
+              disabled={busy || !canMutate || !quantityCanAdjust(product.quantity, -1)}
               onClick={() => onAdjust(-1)}
             >
               <Minus weight="bold" />
@@ -139,20 +150,20 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
               className="quantity-value"
               aria-label={`${t('quantity')}: ${product.quantity}`}
               onClick={onEdit}
-              disabled={busy}
+              disabled={busy || !canMutate}
             >
               {product.quantity}
             </button>
             <button
               aria-label={t('plus')}
-              disabled={busy || !quantityCanAdjust(product.quantity, 1)}
+              disabled={busy || !canMutate || !quantityCanAdjust(product.quantity, 1)}
               onClick={() => onAdjust(1)}
             >
               <Plus weight="bold" />
             </button>
           </div>
         )}
-        <button className="sr-only" onClick={onToggle} disabled={busy}>
+        <button className="sr-only" onClick={onToggle} disabled={busy || !canMutate}>
           {product.is_picked ? t('restore') : t('pick')}
         </button>
       </motion.article>

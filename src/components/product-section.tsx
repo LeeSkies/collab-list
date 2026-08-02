@@ -13,6 +13,7 @@ export function ProductSection({
   onEntranceComplete,
   busyProductIds,
   bulkBusy = false,
+  canMutate = true,
   onEdit,
   onAdjust,
   onToggle,
@@ -28,6 +29,7 @@ export function ProductSection({
   onEntranceComplete?(productId: string): void
   busyProductIds?: ReadonlySet<string>
   bulkBusy?: boolean
+  canMutate?: boolean
   onEdit(product: Product): void
   onAdjust(product: Product, delta: 1 | -1): void
   onToggle(product: Product): void
@@ -68,6 +70,7 @@ export function ProductSection({
                   animateChanges={animateChanges}
                   onEntranceComplete={() => onEntranceComplete?.(product.id)}
                   busy={bulkBusy || busyProductIds?.has(product.id)}
+                  canMutate={canMutate}
                   onEdit={() => onEdit(product)}
                   onAdjust={(delta) => onAdjust(product, delta)}
                   onToggle={() => onToggle(product)}

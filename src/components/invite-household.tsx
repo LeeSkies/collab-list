@@ -189,7 +189,11 @@ function InviteRequestPanel({
             ? t('inviteEmailConfirmationRequired')
             : isApiErrorCode(join.error, 'household_capacity_reached')
               ? t('inviteCapacityReached')
-              : t('requestFailed')}
+              : isApiErrorCode(join.error, 'household_read_only')
+                ? t('householdReadOnly')
+                : isApiErrorCode(join.error, 'household_entitlement_locked')
+                  ? t('householdLocked')
+                  : t('requestFailed')}
         </p>
       )}
       <Button size="lg" onClick={() => join.mutate()} disabled={join.isPending || !preview}>

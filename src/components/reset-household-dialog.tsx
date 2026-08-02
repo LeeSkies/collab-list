@@ -12,12 +12,14 @@ export function ResetHouseholdDialog({
   open,
   onOpenChange,
   onConfirm,
-  pending
+  pending,
+  canMutate = true
 }: {
   open: boolean
   onOpenChange(open: boolean): void
   onConfirm(options: ResetHouseholdOptions): void
   pending: boolean
+  canMutate?: boolean
 }) {
   const { t } = useTranslation()
   const [clearProducts, setClearProducts] = useState(false)
@@ -62,19 +64,21 @@ export function ResetHouseholdDialog({
         title={t('resetHouseholdTitle')}
         body={t('resetHouseholdBody')}
         confirmLabel={t('resetHouseholdContinue')}
-        confirmDisabled={!clearProducts && !removeMembers}
-        pending={pending}
+        confirmDisabled={!canMutate || (!clearProducts && !removeMembers)}
+        pending={pending || !canMutate}
         onConfirm={requestConfirmation}
       >
         <SwitchOption
           checked={clearProducts}
           onCheckedChange={setClearProducts}
           label={t('resetHouseholdProducts')}
+          disabled={!canMutate}
         />
         <SwitchOption
           checked={removeMembers}
           onCheckedChange={setRemoveMembers}
           label={t('resetHouseholdMembers')}
+          disabled={!canMutate}
         />
       </ChoiceDialog>
       <ConfirmDialog
@@ -84,8 +88,10 @@ export function ResetHouseholdDialog({
         body={t('resetHouseholdConfirmBody')}
         confirmLabel={t('resetHouseholdConfirm')}
         destructive
-        pending={pending}
-        onConfirm={confirmReset}
+        pending={pending || !canMutate}
+        onConfirm={() => {
+          if (canMutate) confirmReset()
+        }}
       />
     </>
   )
@@ -94,16 +100,18 @@ export function ResetHouseholdDialog({
 function SwitchOption({
   checked,
   onCheckedChange,
-  label
+  label,
+  disabled = false
 }: {
   checked: boolean
   onCheckedChange(checked: boolean): void
   label: string
+  disabled?: boolean
 }) {
   return (
     <label className="switch-option">
       <span>{label}</span>
-      <Switch.Root checked={checked} onCheckedChange={onCheckedChange}>
+      <Switch.Root checked={checked} onCheckedChange={onCheckedChange} disabled={disabled}>
         <Switch.Thumb />
       </Switch.Root>
     </label>

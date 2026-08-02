@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import type {
   AdminUser,
   HouseholdCreation,
+  HouseholdEntitlement,
   HouseholdInvite,
   HouseholdInvitePreview,
   HouseholdMembership,
@@ -163,6 +164,12 @@ export const api = {
       ),
     create: async () => {
       const rows = await unwrap<HouseholdCreation[]>(supabase.rpc('create_household_with_trial'))
+      return rows[0]!
+    },
+    entitlement: async () => {
+      const rows = await unwrap<HouseholdEntitlement[]>(
+        supabase.rpc('current_household_entitlement')
+      )
       return rows[0]!
     },
     invite: async () => {

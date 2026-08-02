@@ -53,6 +53,21 @@ export interface HouseholdCreation {
   trial_ends_at: string
 }
 
+export type HouseholdAccessState =
+  'active_trial' | 'read_only_grace' | 'unavailable_locked' | 'paid_placeholder'
+
+export interface HouseholdEntitlement {
+  household_id: string
+  access_state: HouseholdAccessState
+  trial_starts_at: string | null
+  trial_ends_at: string | null
+  grace_ends_at: string | null
+  seat_limit: 5
+  enforcement_enabled: boolean
+  can_mutate: boolean
+  reads_available: boolean
+}
+
 export interface AdminUser {
   id: string
   name: string

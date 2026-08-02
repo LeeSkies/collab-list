@@ -312,14 +312,21 @@ select lives_ok(
 );
 set local role postgres;
 select is((select count(*) from public.households), 3::bigint, 'household creation adds one household');
-select is((select count(*) from public.household_trials), 1::bigint, 'household creation adds one trial');
+select is((select count(*) from public.household_trials), 2::bigint, 'household creation adds one trial');
 select is(
-  (select ends_at - starts_at from public.household_trials),
+  (select ends_at - starts_at
+   from public.household_trials as trial
+   join public.household_members as membership on membership.household_id = trial.household_id
+   where membership.user_id = '10000000-0000-0000-0000-000000000004'::uuid),
   interval '14 days',
   'new household trials last fourteen days'
 );
 select is(
-  (select h.name from public.households as h join public.household_trials as t on t.household_id = h.id),
+  (select h.name
+   from public.households as h
+   join public.household_trials as t on t.household_id = h.id
+   join public.household_members as membership on membership.household_id = h.id
+   where membership.user_id = '10000000-0000-0000-0000-000000000004'::uuid),
   'Unassigned''s household',
   'new households get a friendly creator-based name'
 );
@@ -353,7 +360,7 @@ select is(
 );
 set local role postgres;
 select is((select count(*) from public.households), 3::bigint, 'retry does not create a second household');
-select is((select count(*) from public.household_trials), 1::bigint, 'retry does not create a second trial');
+select is((select count(*) from public.household_trials), 2::bigint, 'retry does not create a second trial');
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000008';
 select lives_ok(
@@ -362,7 +369,7 @@ select lives_ok(
 );
 set local role postgres;
 select is((select count(*) from public.households), 4::bigint, 'long-name household creation adds one household');
-select is((select count(*) from public.household_trials), 2::bigint, 'long-name household creation adds one trial');
+select is((select count(*) from public.household_trials), 3::bigint, 'long-name household creation adds one trial');
 select is(
   (select char_length(h.name) from public.households as h join public.household_members as hm on hm.household_id = h.id where hm.user_id = '10000000-0000-0000-0000-000000000008'::uuid),
   80,
@@ -377,7 +384,13 @@ set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000004';
 select is((select count(*) from public.household_trials), 1::bigint, 'household members can read their household trial');
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
-select is((select count(*) from public.household_trials), 0::bigint, 'household trial RLS hides other household trials');
+select is(
+  (select count(*)
+   from public.household_trials as trial
+   where trial.household_id = (select household_id from public.household_members where user_id = '10000000-0000-0000-0000-000000000004'::uuid)),
+  0::bigint,
+  'household trial RLS hides other household trials'
+);
 
 -- Invite links expose only the shaped public preview, and rotation revokes
 -- the previous raw token.

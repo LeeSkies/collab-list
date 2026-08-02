@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth'
-import { api } from '../lib/api'
+import { api, isApiErrorCode } from '../lib/api'
 import type { AdminUser } from '../lib/types'
 import { Button } from './ui/button'
 import { AppDrawer, ConfirmDialog } from './drawer'
@@ -11,10 +11,12 @@ import { ResetHouseholdDialog } from './reset-household-dialog'
 
 export function AdminDrawer({
   open,
-  onOpenChange
+  onOpenChange,
+  canMutate = true
 }: {
   open: boolean
   onOpenChange(open: boolean): void
+  canMutate?: boolean
 }) {
   const { t } = useTranslation()
   const auth = useAuth()
@@ -28,6 +30,21 @@ export function AdminDrawer({
   const isAdmin = auth.profile?.role === 'admin'
   const previousHouseholdId = useRef(householdId)
   const usersQueryKey = ['household-members', householdId] as const
+  function mutationError(reason: unknown) {
+    if (
+      isApiErrorCode(reason, 'household_read_only') ||
+      isApiErrorCode(reason, 'household_entitlement_locked')
+    ) {
+      void client.invalidateQueries({ queryKey: ['household-entitlement', householdId] })
+    }
+    setError(
+      isApiErrorCode(reason, 'household_read_only')
+        ? t('householdReadOnly')
+        : isApiErrorCode(reason, 'household_entitlement_locked')
+          ? t('householdLocked')
+          : t('requestFailed')
+    )
+  }
   useEffect(() => {
     if (previousHouseholdId.current === householdId) return
     setRemoveUser(null)
@@ -54,18 +71,18 @@ export function AdminDrawer({
       setInviteLink(new URL(`${base}invite/${token}`, window.location.origin).toString())
       setCopied(false)
     },
-    onError: () => setError(t('requestFailed'))
+    onError: mutationError
   })
   const handleRequest = useMutation({
     mutationFn: ({ requestId, approve }: { requestId: string; approve: boolean }) =>
       approve ? api.household.approveRequest(requestId) : api.household.rejectRequest(requestId),
     onSuccess: () => client.invalidateQueries({ queryKey: pendingRequestsKey }),
-    onError: () => setError(t('requestFailed'))
+    onError: mutationError
   })
   const remove = useMutation({
     mutationFn: (id: string) => api.household.removeMember(householdId!, id),
     onSuccess: () => client.invalidateQueries({ queryKey: usersQueryKey }),
-    onError: () => setError(t('requestFailed'))
+    onError: mutationError
   })
   const reset = useMutation({
     mutationFn: ({
@@ -82,7 +99,7 @@ export function AdminDrawer({
       void client.invalidateQueries({ queryKey: usersQueryKey })
       void client.invalidateQueries({ queryKey: pendingRequestsKey })
     },
-    onError: () => setError(t('requestFailed'))
+    onError: mutationError
   })
 
   if (!isAdmin) return null
@@ -122,7 +139,7 @@ export function AdminDrawer({
             type="button"
             size="lg"
             onClick={() => createInvite.mutate()}
-            disabled={createInvite.isPending}
+            disabled={createInvite.isPending || !canMutate}
           >
             {createInvite.isPending
               ? t('inviteRequesting')
@@ -152,7 +169,7 @@ export function AdminDrawer({
                       type="button"
                       className="icon-button"
                       aria-label={`${t('approve')} ${request.name}`}
-                      disabled={handleRequest.isPending}
+                      disabled={handleRequest.isPending || !canMutate}
                       onClick={() =>
                         handleRequest.mutate({ requestId: request.requestId, approve: true })
                       }
@@ -163,7 +180,7 @@ export function AdminDrawer({
                       type="button"
                       className="icon-button danger-quiet"
                       aria-label={`${t('reject')} ${request.name}`}
-                      disabled={handleRequest.isPending}
+                      disabled={handleRequest.isPending || !canMutate}
                       onClick={() =>
                         handleRequest.mutate({ requestId: request.requestId, approve: false })
                       }
@@ -189,7 +206,7 @@ export function AdminDrawer({
             size="lg"
             variant="destructive"
             onClick={() => setResetOpen(true)}
-            disabled={reset.isPending}
+            disabled={reset.isPending || !canMutate}
           >
             {t('resetHousehold')}
           </Button>
@@ -216,6 +233,7 @@ export function AdminDrawer({
                   className="icon-button danger-quiet"
                   aria-label={`${t('removeMember')} ${user.name}`}
                   onClick={() => setRemoveUser(user)}
+                  disabled={!canMutate || remove.isPending}
                 >
                   <Trash />
                 </button>
@@ -229,6 +247,7 @@ export function AdminDrawer({
         onOpenChange={setResetOpen}
         pending={reset.isPending}
         onConfirm={(options) => reset.mutate(options)}
+        canMutate={canMutate}
       />
       {removeUser && (
         <ConfirmDialog
@@ -238,7 +257,9 @@ export function AdminDrawer({
           body={t('removeMemberBody')}
           confirmLabel={t('removeMember')}
           destructive
+          pending={remove.isPending || !canMutate}
           onConfirm={() => {
+            if (!canMutate) return
             remove.mutate(removeUser.id)
             setRemoveUser(null)
           }}

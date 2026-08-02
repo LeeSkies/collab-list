@@ -84,6 +84,16 @@ export function GroceryApp() {
     staleTime: 0,
     gcTime: 0
   })
+  const entitlement = useQuery({
+    queryKey: ['household-entitlement', householdId],
+    queryFn: api.household.entitlement,
+    enabled: Boolean(householdId),
+    retry: 1,
+    staleTime: 0,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: true
+  })
+  const canMutate = entitlement.data?.can_mutate ?? true
   const pendingRequests = useQuery({
     queryKey: ['household-requests', householdId],
     queryFn: () => api.household.pendingRequests(householdId!),
@@ -120,6 +130,10 @@ export function GroceryApp() {
       setToast(t('connected'))
       if (householdId) {
         void client.refetchQueries({ queryKey: productsQueryKey, type: 'active' })
+        void client.refetchQueries({
+          queryKey: ['household-entitlement', householdId],
+          type: 'active'
+        })
       }
     }
     const offline = () => setOnline(false)
@@ -225,7 +239,7 @@ export function GroceryApp() {
   const duplicate = signature
     ? list.find((product) => product.name_signature === signature)
     : undefined
-  const canCreate = Boolean(householdId && normalizeText(search)) && !duplicate
+  const canCreate = canMutate && Boolean(householdId && normalizeText(search)) && !duplicate
 
   async function refreshProducts(productId?: string) {
     try {
@@ -247,15 +261,26 @@ export function GroceryApp() {
     return true
   }
   async function mutationError(reason: unknown, productId?: string) {
+    if (
+      reason instanceof ApiError &&
+      (reason.message.includes('household_read_only') ||
+        reason.message.includes('household_entitlement_locked'))
+    ) {
+      void client.invalidateQueries({ queryKey: ['household-entitlement', householdId] })
+    }
     setToast(
       isProductConflict(reason)
         ? t('conflict')
         : reason instanceof ApiError
           ? reason.code === '23505'
             ? t('duplicate')
-            : reason.code === 'timeout'
-              ? t('timeout')
-              : t('requestFailed')
+            : reason.message.includes('household_read_only')
+              ? t('householdReadOnly')
+              : reason.message.includes('household_entitlement_locked')
+                ? t('householdLocked')
+                : reason.code === 'timeout'
+                  ? t('timeout')
+                  : t('requestFailed')
           : navigator.onLine
             ? t('requestFailed')
             : t('offline')
@@ -412,6 +437,7 @@ export function GroceryApp() {
   })
 
   function activateCreate() {
+    if (!canMutate) return
     if (duplicate) {
       setDuplicatePulse(duplicate.id)
       setToast(t('duplicate'))
@@ -425,7 +451,7 @@ export function GroceryApp() {
   }
 
   async function adjustProduct(product: Product, delta: 1 | -1) {
-    if (!lockProduct(product.id)) return
+    if (!canMutate || !lockProduct(product.id)) return
     try {
       await adjust.mutateAsync({ product, delta })
     } catch {
@@ -436,7 +462,7 @@ export function GroceryApp() {
   }
 
   async function toggleProduct(product: Product) {
-    if (!lockProduct(product.id)) return
+    if (!canMutate || !lockProduct(product.id)) return
     try {
       await toggle.mutateAsync(product)
     } catch {
@@ -447,6 +473,7 @@ export function GroceryApp() {
   }
 
   async function saveProduct(product: Product, changes: ProductChanges) {
+    if (!canMutate) return
     if (!lockProduct(product.id)) throw new ApiError('busy', 'Product update already in progress')
     try {
       await update.mutateAsync({ product, changes })
@@ -456,6 +483,7 @@ export function GroceryApp() {
   }
 
   async function deleteProduct(product: Product) {
+    if (!canMutate) return
     if (!lockProduct(product.id)) throw new ApiError('busy', 'Product update already in progress')
     try {
       await remove.mutateAsync(product)
@@ -465,7 +493,7 @@ export function GroceryApp() {
   }
 
   async function restoreAllProducts(options: { clearNotes: boolean; resetQuantities: boolean }) {
-    if (!lockBulk()) return
+    if (!canMutate || !lockBulk()) return
     try {
       await restoreAll.mutateAsync(options)
     } catch {
@@ -485,6 +513,15 @@ export function GroceryApp() {
         onAdmin={() => setAdminOpen(true)}
         pendingRequestCount={pendingRequests.data?.length ?? 0}
       />
+      {entitlement.data?.enforcement_enabled &&
+        entitlement.data.access_state !== 'active_trial' &&
+        entitlement.data.access_state !== 'paid_placeholder' && (
+          <div className="entitlement-banner" role="status">
+            {entitlement.data.access_state === 'read_only_grace'
+              ? t('householdReadOnly')
+              : t('householdLocked')}
+          </div>
+        )}
       <section className="list-surface">
         <div className="list-toolbar">
           <div className="search-shell">
@@ -531,6 +568,7 @@ export function GroceryApp() {
                       : t('create', { name: '' })
                 }
                 onClick={activateCreate}
+                disabled={!canCreate}
               >
                 <Plus weight="bold" />
               </button>
@@ -585,6 +623,7 @@ export function GroceryApp() {
                 onEntranceComplete={completeEntrance}
                 busyProductIds={mutationState.productIds}
                 bulkBusy={mutationState.bulk}
+                canMutate={canMutate}
                 onEdit={setSelected}
                 onAdjust={adjustProduct}
                 onToggle={toggleProduct}
@@ -599,6 +638,7 @@ export function GroceryApp() {
                   <button
                     className="icon-button restore-all-button"
                     disabled={
+                      !canMutate ||
                       !list.some((product) => product.is_picked) ||
                       mutationState.bulk ||
                       mutationState.productIds.size > 0
@@ -614,6 +654,7 @@ export function GroceryApp() {
                 onEntranceComplete={completeEntrance}
                 busyProductIds={mutationState.productIds}
                 bulkBusy={mutationState.bulk}
+                canMutate={canMutate}
                 onEdit={setSelected}
                 onAdjust={adjustProduct}
                 onToggle={toggleProduct}
@@ -640,10 +681,11 @@ export function GroceryApp() {
           onSave={saveProduct}
           onDelete={deleteProduct}
           onToggle={toggleProduct}
+          canMutate={canMutate}
         />
       )}
       {auth.profile?.role === 'admin' && (
-        <AdminDrawer open={adminOpen} onOpenChange={setAdminOpen} />
+        <AdminDrawer open={adminOpen} onOpenChange={setAdminOpen} canMutate={canMutate} />
       )}
       <CategoryFilterDrawer
         open={categoryFilterOpen}
@@ -656,6 +698,7 @@ export function GroceryApp() {
         open={restoreAllOpen}
         onOpenChange={setRestoreAllOpen}
         pending={mutationState.bulk}
+        canMutate={canMutate}
         onConfirm={(options) => void restoreAllProducts(options)}
       />
       <AppToast message={toast} />
