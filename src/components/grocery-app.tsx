@@ -72,6 +72,7 @@ export function GroceryApp() {
     productIds: new Set(),
     bulk: false
   })
+  const [renderedAt] = useState(() => Date.now())
   const searchRef = useRef<HTMLInputElement>(null)
   const householdId = auth.profile?.household_id
   const previousHouseholdId = useRef<string | undefined>(householdId)
@@ -94,6 +95,31 @@ export function GroceryApp() {
     refetchIntervalInBackground: true
   })
   const canMutate = entitlement.data?.can_mutate ?? true
+  const showBoundaryBanner = Boolean(
+    entitlement.data?.enforcement_enabled &&
+    entitlement.data.access_state !== 'active_trial' &&
+    entitlement.data.access_state !== 'paid_placeholder' &&
+    entitlement.data.access_state !== 'paid_active'
+  )
+  const subscription = useQuery({
+    queryKey: ['household-subscription', householdId],
+    queryFn: api.household.subscription,
+    enabled: Boolean(householdId && showBoundaryBanner),
+    retry: 1,
+    staleTime: 30_000
+  })
+  const boundaryIsPaid = Boolean(
+    entitlement.data?.access_state === 'paid_active' ||
+    (subscription.data && subscription.data.status !== 'none')
+  )
+  const paidBoundaryNeedsAttention = Boolean(
+    boundaryIsPaid &&
+    entitlement.data?.access_state === 'read_only_grace' &&
+    subscription.data?.current_period_end &&
+    new Date(subscription.data.current_period_end).getTime() > renderedAt &&
+    subscription.data.status !== 'active' &&
+    subscription.data.status !== 'trialing'
+  )
   const pendingRequests = useQuery({
     queryKey: ['household-requests', householdId],
     queryFn: () => api.household.pendingRequests(householdId!),
@@ -261,12 +287,27 @@ export function GroceryApp() {
     return true
   }
   async function mutationError(reason: unknown, productId?: string) {
-    if (
+    const entitlementBoundaryError =
       reason instanceof ApiError &&
       (reason.message.includes('household_read_only') ||
         reason.message.includes('household_entitlement_locked'))
-    ) {
-      void client.invalidateQueries({ queryKey: ['household-entitlement', householdId] })
+    const paidBoundary = boundaryIsPaid
+    const paidAttention = paidBoundaryNeedsAttention
+    if (entitlementBoundaryError && householdId) {
+      void client
+        .fetchQuery({
+          queryKey: ['household-entitlement', householdId],
+          queryFn: api.household.entitlement,
+          staleTime: 0
+        })
+        .catch(() => undefined)
+      void client
+        .fetchQuery({
+          queryKey: ['household-subscription', householdId],
+          queryFn: api.household.subscription,
+          staleTime: 0
+        })
+        .catch(() => undefined)
     }
     setToast(
       isProductConflict(reason)
@@ -275,9 +316,15 @@ export function GroceryApp() {
           ? reason.code === '23505'
             ? t('duplicate')
             : reason.message.includes('household_read_only')
-              ? t('householdReadOnly')
+              ? paidBoundary
+                ? paidAttention
+                  ? t('householdPaidAttention')
+                  : t('householdReadOnlyPaid')
+                : t('householdReadOnly')
               : reason.message.includes('household_entitlement_locked')
-                ? t('householdLocked')
+                ? paidBoundary
+                  ? t('householdLockedPaid')
+                  : t('householdLocked')
                 : reason.code === 'timeout'
                   ? t('timeout')
                   : t('requestFailed')
@@ -513,15 +560,19 @@ export function GroceryApp() {
         onAdmin={() => setAdminOpen(true)}
         pendingRequestCount={pendingRequests.data?.length ?? 0}
       />
-      {entitlement.data?.enforcement_enabled &&
-        entitlement.data.access_state !== 'active_trial' &&
-        entitlement.data.access_state !== 'paid_placeholder' && (
-          <div className="entitlement-banner" role="status">
-            {entitlement.data.access_state === 'read_only_grace'
-              ? t('householdReadOnly')
+      {showBoundaryBanner && (
+        <div className="entitlement-banner" role="status">
+          {entitlement.data?.access_state === 'read_only_grace'
+            ? boundaryIsPaid
+              ? paidBoundaryNeedsAttention
+                ? t('householdPaidAttention')
+                : t('householdReadOnlyPaid')
+              : t('householdReadOnly')
+            : boundaryIsPaid
+              ? t('householdLockedPaid')
               : t('householdLocked')}
-          </div>
-        )}
+        </div>
+      )}
       <section className="list-surface">
         <div className="list-toolbar">
           <div className="search-shell">
@@ -682,6 +733,8 @@ export function GroceryApp() {
           onDelete={deleteProduct}
           onToggle={toggleProduct}
           canMutate={canMutate}
+          boundaryIsPaid={boundaryIsPaid}
+          paidBoundaryNeedsAttention={paidBoundaryNeedsAttention}
         />
       )}
       {auth.profile?.role === 'admin' && (

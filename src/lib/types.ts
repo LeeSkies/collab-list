@@ -54,7 +54,7 @@ export interface HouseholdCreation {
 }
 
 export type HouseholdAccessState =
-  'active_trial' | 'read_only_grace' | 'unavailable_locked' | 'paid_placeholder'
+  'active_trial' | 'paid_active' | 'read_only_grace' | 'unavailable_locked' | 'paid_placeholder'
 
 export interface HouseholdEntitlement {
   household_id: string
@@ -62,10 +62,42 @@ export interface HouseholdEntitlement {
   trial_starts_at: string | null
   trial_ends_at: string | null
   grace_ends_at: string | null
-  seat_limit: 5
+  seat_limit: number
   enforcement_enabled: boolean
   can_mutate: boolean
   reads_available: boolean
+}
+
+export type SubscriptionStatus =
+  'none' | 'trialing' | 'active' | 'past_due' | 'unpaid' | 'canceled' | 'paused'
+
+export interface HouseholdSubscription {
+  household_id: string
+  status: SubscriptionStatus
+  provider: string | null
+  provider_subscription_id: string | null
+  current_period_start: string | null
+  current_period_end: string | null
+  grace_ends_at: string | null
+  cancel_at_period_end: boolean
+  canceled_at: string | null
+  base_seat_allowance: number
+  add_on_seat_count: number
+  add_on_unit_amount_minor_units: number | null
+  currency: string | null
+  provider_event_id: string | null
+  active_member_count: number
+  billed_seat_count: number
+  billing_enabled: boolean
+}
+
+export type BillingActionType = 'subscribe' | 'cancel_at_period_end' | 'resubscribe'
+
+export interface BillingActionResult {
+  actionId: string
+  action: BillingActionType
+  status: string
+  createdAt: string
 }
 
 export interface AdminUser {

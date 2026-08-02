@@ -190,9 +190,9 @@ function InviteRequestPanel({
             : isApiErrorCode(join.error, 'household_capacity_reached')
               ? t('inviteCapacityReached')
               : isApiErrorCode(join.error, 'household_read_only')
-                ? t('householdReadOnly')
+                ? t('inviteHouseholdReadOnly')
                 : isApiErrorCode(join.error, 'household_entitlement_locked')
-                  ? t('householdLocked')
+                  ? t('inviteHouseholdLocked')
                   : t('requestFailed')}
         </p>
       )}

@@ -2,12 +2,15 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type {
   AdminUser,
+  BillingActionResult,
+  BillingActionType,
   HouseholdCreation,
   HouseholdEntitlement,
   HouseholdInvite,
   HouseholdInvitePreview,
   HouseholdMembership,
   HouseholdRequestState,
+  HouseholdSubscription,
   PendingHouseholdRequest,
   Product,
   ProductChanges,
@@ -258,9 +261,12 @@ export const api = {
         })
       )
     },
-    approveRequest: async (requestId: string) => {
+    approveRequest: async (requestId: string, confirmAddOnCharge = false) => {
       const rows = await unwrap<Array<{ request_id: string; status: string }>>(
-        supabase.rpc('approve_household_request', { p_request_id: requestId })
+        supabase.rpc('approve_household_request', {
+          p_request_id: requestId,
+          p_confirm_add_on_charge: confirmAddOnCharge
+        })
       )
       return rows[0]!
     },
@@ -269,6 +275,29 @@ export const api = {
         supabase.rpc('reject_household_request', { p_request_id: requestId })
       )
       return rows[0]!
+    },
+    subscription: async () => {
+      const rows = await unwrap<HouseholdSubscription[]>(
+        supabase.rpc('current_household_subscription')
+      )
+      return rows[0]!
+    },
+    requestBillingAction: async (action: BillingActionType) => {
+      const rows = await unwrap<
+        Array<{
+          action_id: string
+          action: BillingActionType
+          status: string
+          created_at: string
+        }>
+      >(supabase.rpc('admin_request_billing_action', { p_action: action }))
+      const result = rows[0]!
+      return {
+        actionId: result.action_id,
+        action: result.action,
+        status: result.status,
+        createdAt: result.created_at
+      } satisfies BillingActionResult
     },
     reset: async (clearProducts: boolean, removeMembers: boolean) => {
       const rows = await unwrap<Array<{ products_deleted: number; members_removed: number }>>(

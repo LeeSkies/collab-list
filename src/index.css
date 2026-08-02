@@ -1425,6 +1425,7 @@ body::before {
 }
 .invite-management,
 .pending-requests,
+.plan-management,
 .reset-management {
   display: grid;
   gap: 12px;
@@ -1439,6 +1440,22 @@ body::before {
   color: var(--muted-foreground);
   font-size: 12px;
   line-height: 1.4;
+}
+.plan-summary {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+.plan-notice {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .invite-link-row {
   display: grid;

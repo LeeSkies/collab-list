@@ -27,7 +27,9 @@ export function ProductDrawer({
   onDelete,
   onToggle,
   pending,
-  canMutate = true
+  canMutate = true,
+  boundaryIsPaid = false,
+  paidBoundaryNeedsAttention = false
 }: {
   product: Product
   authoritativeProduct?: Product
@@ -39,6 +41,8 @@ export function ProductDrawer({
   onToggle(product: Product): void
   pending: boolean
   canMutate?: boolean
+  boundaryIsPaid?: boolean
+  paidBoundaryNeedsAttention?: boolean
 }) {
   const { t } = useTranslation()
   const productValues = {
@@ -95,9 +99,15 @@ export function ProductDrawer({
         isProductConflict(reason)
           ? t('conflict')
           : isApiErrorCode(reason, 'household_read_only')
-            ? t('householdReadOnly')
+            ? boundaryIsPaid
+              ? paidBoundaryNeedsAttention
+                ? t('householdPaidAttention')
+                : t('householdReadOnlyPaid')
+              : t('householdReadOnly')
             : isApiErrorCode(reason, 'household_entitlement_locked')
-              ? t('householdLocked')
+              ? boundaryIsPaid
+                ? t('householdLockedPaid')
+                : t('householdLocked')
               : t('requestFailed')
       )
     }

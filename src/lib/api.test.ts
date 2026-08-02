@@ -179,6 +179,101 @@ describe('household.reset', () => {
   })
 })
 
+describe('household.approveRequest', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('sends the explicit add-on charge confirmation', async () => {
+    rpc.mockResolvedValue({ data: [{ request_id: 'req-1', status: 'approved' }], error: null })
+
+    await expect(api.household.approveRequest('req-1', true)).resolves.toMatchObject({
+      status: 'approved'
+    })
+    expect(rpc).toHaveBeenCalledWith('approve_household_request', {
+      p_request_id: 'req-1',
+      p_confirm_add_on_charge: true
+    })
+  })
+
+  it('defaults to no add-on confirmation', async () => {
+    rpc.mockResolvedValue({ data: [{ request_id: 'req-1', status: 'approved' }], error: null })
+
+    await api.household.approveRequest('req-1')
+
+    expect(rpc).toHaveBeenCalledWith('approve_household_request', {
+      p_request_id: 'req-1',
+      p_confirm_add_on_charge: false
+    })
+  })
+})
+
+describe('household.subscription', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('reads the authoritative subscription and seat state', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          household_id: 'household-id',
+          status: 'active',
+          provider: 'stripe',
+          provider_subscription_id: 'sub_123',
+          current_period_start: '2026-08-01T00:00:00Z',
+          current_period_end: '2026-08-31T00:00:00Z',
+          grace_ends_at: '2026-09-07T00:00:00Z',
+          cancel_at_period_end: false,
+          canceled_at: null,
+          base_seat_allowance: 5,
+          add_on_seat_count: 2,
+          add_on_unit_amount_minor_units: 990,
+          currency: 'USD',
+          provider_event_id: null,
+          active_member_count: 7,
+          billed_seat_count: 2,
+          billing_enabled: true
+        }
+      ],
+      error: null
+    })
+
+    await expect(api.household.subscription()).resolves.toMatchObject({
+      status: 'active',
+      base_seat_allowance: 5,
+      add_on_seat_count: 2,
+      billed_seat_count: 2,
+      billing_enabled: true
+    })
+    expect(rpc).toHaveBeenCalledWith('current_household_subscription')
+  })
+})
+
+describe('household.requestBillingAction', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('records the admin billing intent through the RPC', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          action_id: 'act-1',
+          action: 'cancel_at_period_end',
+          status: 'pending',
+          created_at: '2026-08-02T00:00:00Z'
+        }
+      ],
+      error: null
+    })
+
+    await expect(api.household.requestBillingAction('cancel_at_period_end')).resolves.toEqual({
+      actionId: 'act-1',
+      action: 'cancel_at_period_end',
+      status: 'pending',
+      createdAt: '2026-08-02T00:00:00Z'
+    })
+    expect(rpc).toHaveBeenCalledWith('admin_request_billing_action', {
+      p_action: 'cancel_at_period_end'
+    })
+  })
+})
+
 describe('products.list', () => {
   it('forwards React Query cancellation to the Supabase request', async () => {
     const abortSignal = vi.fn(

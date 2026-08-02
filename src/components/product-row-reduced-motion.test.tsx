@@ -3,6 +3,7 @@ import { I18nextProvider } from 'react-i18next'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import type { Product } from '../lib/types'
+import { ProductRow } from './product-row'
 
 const product: Product = {
   household_id: '20000000-0000-0000-0000-000000000001',
@@ -25,7 +26,7 @@ const product: Product = {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('ProductRow reduced motion', () => {
-  it('uses opacity without spatial scaling for a new product', async () => {
+  it('uses opacity without spatial scaling for a new product', () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn(() => ({
@@ -37,8 +38,6 @@ describe('ProductRow reduced motion', () => {
         dispatchEvent: vi.fn()
       }))
     )
-    const { ProductRow } = await import('./product-row')
-
     const view = render(
       <I18nextProvider i18n={i18n}>
         <ProductRow

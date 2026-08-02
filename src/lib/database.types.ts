@@ -94,6 +94,54 @@ export type Database = {
         }
         Relationships: []
       }
+      household_billing_actions: {
+        Row: {
+          action: string
+          created_at: string
+          detail: Json
+          household_id: string
+          id: string
+          requested_by: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          detail?: Json
+          household_id: string
+          id?: string
+          requested_by: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          detail?: Json
+          household_id?: string
+          id?: string
+          requested_by?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'household_billing_actions_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: false
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'household_billing_actions_requested_by_fkey'
+            columns: ['requested_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       household_entitlements: {
         Row: {
           created_at: string
@@ -310,6 +358,71 @@ export type Database = {
           }
         ]
       }
+      household_subscriptions: {
+        Row: {
+          add_on_seat_count: number
+          add_on_unit_amount_minor_units: number | null
+          base_seat_allowance: number
+          cancel_at_period_end: boolean
+          canceled_at: string | null
+          created_at: string
+          currency: string | null
+          current_period_end: string
+          current_period_start: string
+          household_id: string
+          provider: string
+          provider_event_at: string
+          provider_event_id: string
+          provider_subscription_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          add_on_seat_count?: number
+          add_on_unit_amount_minor_units?: number | null
+          base_seat_allowance?: number
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          created_at?: string
+          currency?: string | null
+          current_period_end: string
+          current_period_start: string
+          household_id: string
+          provider: string
+          provider_event_at?: string
+          provider_event_id: string
+          provider_subscription_id: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          add_on_seat_count?: number
+          add_on_unit_amount_minor_units?: number | null
+          base_seat_allowance?: number
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          created_at?: string
+          currency?: string | null
+          current_period_end?: string
+          current_period_start?: string
+          household_id?: string
+          provider?: string
+          provider_event_at?: string
+          provider_event_id?: string
+          provider_subscription_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'household_subscriptions_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: true
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       household_trials: {
         Row: {
           created_at: string
@@ -466,6 +579,44 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_provider_events: {
+        Row: {
+          applied_at: string
+          household_id: string
+          id: number
+          provider: string
+          provider_event_at: string
+          provider_event_id: string
+          provider_subscription_id: string | null
+        }
+        Insert: {
+          applied_at?: string
+          household_id: string
+          id?: never
+          provider: string
+          provider_event_at?: string
+          provider_event_id: string
+          provider_subscription_id?: string | null
+        }
+        Update: {
+          applied_at?: string
+          household_id?: string
+          id?: never
+          provider?: string
+          provider_event_at?: string
+          provider_event_id?: string
+          provider_subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscription_provider_events_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: false
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -501,8 +652,17 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_request_billing_action: {
+        Args: { p_action: string }
+        Returns: {
+          action: string
+          action_id: string
+          created_at: string
+          status: string
+        }[]
+      }
       approve_household_request: {
-        Args: { p_request_id: string }
+        Args: { p_confirm_add_on_charge?: boolean; p_request_id: string }
         Returns: {
           request_id: string
           status: string
@@ -576,6 +736,28 @@ export type Database = {
           status: string
         }[]
       }
+      current_household_subscription: {
+        Args: never
+        Returns: {
+          active_member_count: number
+          add_on_seat_count: number
+          add_on_unit_amount_minor_units: number | null
+          base_seat_allowance: number
+          billed_seat_count: number
+          billing_enabled: boolean
+          cancel_at_period_end: boolean
+          canceled_at: string | null
+          currency: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          grace_ends_at: string | null
+          household_id: string
+          provider: string | null
+          provider_event_id: string | null
+          provider_subscription_id: string | null
+          status: string
+        }[]
+      }
       delete_product: {
         Args: { p_expected_version: number; p_product_id: string }
         Returns: boolean
@@ -584,6 +766,10 @@ export type Database = {
       expire_household_join_requests: {
         Args: { p_household_id: string }
         Returns: undefined
+      }
+      household_effective_seat_limit: {
+        Args: { p_household_id: string }
+        Returns: number
       }
       household_entitlement_for: {
         Args: { p_household_id: string }
@@ -706,6 +892,25 @@ export type Database = {
       }
       sync_account_trial_eligibility: {
         Args: { p_user_id: string }
+        Returns: undefined
+      }
+      sync_subscription_from_provider: {
+        Args: {
+          p_add_on_seat_count?: number
+          p_add_on_unit_amount_minor_units?: number
+          p_base_seat_allowance?: number
+          p_cancel_at_period_end?: boolean
+          p_canceled_at?: string
+          p_currency?: string
+          p_current_period_end: string
+          p_current_period_start: string
+          p_household_id: string
+          p_provider: string
+          p_provider_event_at: string
+          p_provider_event_id?: string
+          p_provider_subscription_id: string
+          p_status: string
+        }
         Returns: undefined
       }
       toggle_product_picked: {
