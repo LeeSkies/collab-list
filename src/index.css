@@ -161,26 +161,44 @@ body::before {
   border-radius: 5px;
   background: var(--secondary);
 }
-.leaf-loader {
+/* Splash screen — a full-bleed deep-green arrival while auth is restoring. */
+.splash-screen {
+  position: relative;
+  display: grid;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  place-items: center;
+  color: rgb(246 241 231 / 0.95);
+  background:
+    radial-gradient(circle at 50% 44%, rgb(246 241 231 / 0.07), transparent 60%),
+    oklch(0.445 0.074 154);
+}
+.splash-ring {
+  position: absolute;
+  z-index: 0;
+  top: 17%;
+  left: 50%;
+  width: 178vw;
+  aspect-ratio: 2.5 / 1;
+  border: 1px solid rgb(246 241 231 / 0.14);
+  border-radius: 50%;
+  transform: translateX(-50%) rotate(-18deg);
+  box-shadow:
+    0 0 0 30px rgb(246 241 231 / 0.03),
+    0 0 0 60px rgb(246 241 231 / 0.02);
+}
+.splash-center {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
-  gap: 14px;
-  color: var(--primary);
-  font-size: 13px;
-  font-weight: 650;
 }
-.leaf-loader svg {
-  width: 54px;
-  height: 54px;
+.splash-mark {
+  width: clamp(130px, 34vw, 176px);
+  height: clamp(130px, 34vw, 176px);
   overflow: visible;
-  fill: currentColor;
-}
-.leaf-loader svg circle {
-  fill: var(--accent);
-}
-.leaf-loader.compact svg {
-  width: 26px;
-  height: 26px;
+  filter: drop-shadow(0 16px 26px rgb(16 39 25 / 0.42));
 }
 
 .login-page {

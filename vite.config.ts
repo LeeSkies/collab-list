@@ -23,7 +23,7 @@ export default defineConfig({
         short_name: 'Groceries',
         description: 'A calm shared grocery list',
         theme_color: '#f6f1e7',
-        background_color: '#f6f1e7',
+        background_color: '#2f6041',
         display: 'standalone',
         start_url: base,
         scope: base,
