@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { PRODUCT_CATEGORIES } from '../lib/product-category'
+import { buildProductGroups } from '../lib/product-groups'
 import type { Product } from '../lib/types'
 import { ProductRow } from './product-row'
 
@@ -39,13 +39,7 @@ export function ProductSection({
   animateChanges?: boolean
 }) {
   const { t } = useTranslation()
-  const groups = groupByCategory
-    ? PRODUCT_CATEGORIES.map((category) => ({
-        key: category,
-        label: t(`category_${category}`),
-        products: products.filter((product) => product.category === category)
-      })).filter((group) => group.products.length > 0)
-    : [{ key: 'all', label: '', products }]
+  const groups = buildProductGroups(products, t, groupByCategory)
 
   return (
     <section className="product-section">
