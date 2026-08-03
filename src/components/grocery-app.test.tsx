@@ -454,6 +454,50 @@ describe('GroceryApp realtime categories', () => {
   })
 })
 
+describe('GroceryApp quantity reconciliation', () => {
+  it('does not let a stale quantity success reverse a newer authoritative revision', async () => {
+    const user = userEvent.setup()
+    const authoritative = { ...newProduct, quantity: '3.00', version: 3 }
+    vi.spyOn(api.products, 'list')
+      .mockResolvedValueOnce([newProduct])
+      .mockResolvedValue([authoritative])
+    let resolveAdjust!: (product: Product) => void
+    const staleAdjust = new Promise<Product>((resolve) => {
+      resolveAdjust = resolve
+    })
+    const adjust = vi.spyOn(api.products, 'adjust').mockReturnValue(staleAdjust)
+    let onProductChange: () => void = () => undefined
+    vi.spyOn(api.realtime, 'subscribe').mockImplementation((onChange) => {
+      onProductChange = onChange
+      return { unsubscribe: vi.fn() } as never
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Increase quantity' }))
+    expect(adjust).toHaveBeenCalledWith(newProduct.id, 1, newProduct.version)
+
+    // A peer's authoritative change lands while the quantity RPC is still in flight.
+    onProductChange()
+    await waitFor(() => {
+      expect(client.getQueryData(['products', newProduct.household_id])).toEqual([authoritative])
+    })
+
+    // The slow local RPC resolves with a stale revision afterwards.
+    resolveAdjust({ ...newProduct, quantity: '2.00', version: 2 })
+    await waitFor(() => {
+      expect(client.getQueryData(['products', newProduct.household_id])).toEqual([authoritative])
+    })
+  })
+})
+
 describe('GroceryApp product tour', () => {
   it('shows a new member tour after household entry and does not reopen after completion', async () => {
     const user = userEvent.setup()

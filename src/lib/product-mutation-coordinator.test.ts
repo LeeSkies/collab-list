@@ -108,3 +108,32 @@ describe('applyAuthoritativeProduct', () => {
     ])
   })
 })
+
+describe('quantity reconciliation', () => {
+  it('settles rapid quantity changes on the latest authoritative revision', () => {
+    const first = { id: 'a', version: 2, quantity: '2.00' }
+    const second = { id: 'a', version: 3, quantity: '3.00' }
+
+    // A rapid plus that wins keeps its revision even if an older echo arrives later.
+    expect(applyAuthoritativeProduct([first], second)).toEqual([second])
+    expect(applyAuthoritativeProduct([second], first)).toEqual([second])
+  })
+
+  it('does not double-apply a duplicate realtime echo of the same quantity change', () => {
+    const echo = { id: 'a', version: 3, quantity: '3.00' }
+
+    expect(applyAuthoritativeProduct([echo], echo)).toEqual([echo])
+  })
+
+  it('a failed quantity change restores only its own optimistic revision', () => {
+    const previous = { id: 'a', version: 1, quantity: '1.00' }
+    const optimistic = { id: 'a', version: 2, quantity: '2.00' }
+    const authoritative = { id: 'a', version: 3, quantity: '3.00' }
+
+    expect(rollbackOptimisticProduct([optimistic], optimistic, previous)).toEqual([previous])
+    // A stale failure must not resurrect its revision over a newer authoritative row.
+    expect(rollbackOptimisticProduct([authoritative], optimistic, previous)).toEqual([
+      authoritative
+    ])
+  })
+})

@@ -418,7 +418,14 @@ export function GroceryApp() {
       replaceProduct(optimistic)
       return { previous, optimistic }
     },
-    onSuccess: replaceProduct,
+    onSuccess: (next) => {
+      applyAuthoritative(next)
+      const applied =
+        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === next.id) ??
+        next
+      if (householdId && selected?.id === applied.id && selected.household_id === householdId)
+        setSelected(applied)
+    },
     onError: async (reason, variables, context) => {
       if (context) rollbackProduct(context.optimistic, context.previous)
       await mutationError(reason, variables.product.id)
