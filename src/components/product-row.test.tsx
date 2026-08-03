@@ -1,9 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import type { Product } from '../lib/types'
 import { ProductRow } from './product-row'
+
+afterEach(() => vi.useRealTimers())
 
 const product: Product = {
   household_id: '20000000-0000-0000-0000-000000000001',
@@ -69,5 +71,30 @@ describe('ProductRow', () => {
     expect(
       screen.getByRole('button', { name: i18n.t('edit', { name: product.name }) })
     ).toBeDisabled()
+  })
+
+  it('excludes quantity controls from row-wide hold behavior', () => {
+    vi.useFakeTimers()
+    const { container } = renderRow()
+    const plus = screen.getByRole('button', { name: i18n.t('plus') })
+
+    fireEvent.pointerDown(plus, {
+      pointerId: 9,
+      isPrimary: true,
+      button: 0,
+      clientX: 20,
+      clientY: 20
+    })
+    act(() => vi.advanceTimersByTime(500))
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(container.querySelector('.held-name-reveal')).not.toBeInTheDocument()
+  })
+
+  it('suppresses the browser context menu on the row surface', () => {
+    const { container } = renderRow()
+    const row = container.querySelector('.product-row')!
+    const prevented = fireEvent.contextMenu(row)
+    expect(prevented).toBe(false)
   })
 })
