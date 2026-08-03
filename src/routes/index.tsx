@@ -1,14 +1,28 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useAuth } from '../auth'
+import { CreateHouseholdOnboarding } from '../components/create-household-onboarding'
+import { DeletedHouseholdScreen } from '../components/deleted-household-screen'
 import { GroceryApp } from '../components/grocery-app'
-import { LeafLoader } from '../components/leaf-loader'
+import { SplashScreen } from '../components/splash-screen'
 import { LoginForm } from '../components/login-form'
 import { isSupabaseConfigured } from '../lib/supabase'
+import { api } from '../lib/api'
 
 export const Route = createFileRoute('/')({ component: Home })
 
 function Home() {
   const auth = useAuth()
+  const [createRequested, setCreateRequested] = useState(false)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
+  const deletedHousehold = useQuery({
+    queryKey: ['deleted-household', auth.user?.id],
+    queryFn: api.household.deleted,
+    enabled: Boolean(auth.session),
+    retry: false
+  })
+  const isInvitePath = window.location.pathname.startsWith('/invite/')
   if (!isSupabaseConfigured)
     return (
       <main className="config-missing">
@@ -20,10 +34,31 @@ function Home() {
       </main>
     )
   if (auth.restoring)
+    return <SplashScreen />
+  if (auth.session) {
+    if (deletedHousehold.data) return <DeletedHouseholdScreen household={deletedHousehold.data} />
+    if (auth.profile?.household_id && !onboardingOpen) return <GroceryApp />
+    if (isInvitePath) return <LoginForm showCreateHousehold={false} inviteMode />
     return (
-      <main className="loading-page">
-        <LeafLoader />
-      </main>
+      <CreateHouseholdOnboarding
+        onHouseholdCreated={() => setOnboardingOpen(true)}
+        onContinueToList={() => setOnboardingOpen(false)}
+      />
     )
-  return auth.session ? <GroceryApp /> : <LoginForm />
+  }
+  if (createRequested && !isInvitePath)
+    return (
+      <CreateHouseholdOnboarding
+        onBack={() => setCreateRequested(false)}
+        onHouseholdCreated={() => setOnboardingOpen(true)}
+        onContinueToList={() => setOnboardingOpen(false)}
+      />
+    )
+  return (
+    <LoginForm
+      onCreateHousehold={() => setCreateRequested(true)}
+      showCreateHousehold={!isInvitePath}
+      inviteMode={isInvitePath}
+    />
+  )
 }

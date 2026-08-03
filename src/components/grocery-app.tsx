@@ -8,36 +8,30 @@ import {
   MagnifyingGlass,
   Plus,
   SignOut,
+  UserCircle,
   UsersThree,
   WifiSlash,
   X
 } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from '../auth'
-import { api, ApiError, isProductConflict } from '../lib/api'
-import {
-  duplicateSignature,
-  normalizeNameForStorage,
-  normalizeText,
-  orderProductSections,
-  type ProductSortMode
-} from '../lib/product'
-import {
-  ProductMutationCoordinator,
-  rollbackOptimisticProduct,
-  type ProductMutationState
-} from '../lib/product-mutation-coordinator'
-import { PRODUCT_CATEGORIES, type ProductCategory } from '../lib/product-category'
-import type { Product, ProductChanges } from '../lib/types'
-import { TrailingRefresh } from '../lib/trailing-refresh'
+import { api } from '../lib/api'
+import { supabase } from '../lib/supabase'
+import { normalizeText, type ProductSortMode } from '../lib/product'
+import type { ProductCategory } from '../lib/product-category'
+import type { Product } from '../lib/types'
+import { useGroceryList } from '../hooks/use-grocery-list'
+import { Button } from './ui/button'
+import { AccountDrawer } from './account-drawer'
 import { AdminDrawer } from './admin-drawer'
 import { CategoryFilterDrawer } from './category-filter-drawer'
 import { ProductDrawer } from './product-drawer'
 import { ProductSection } from './product-section'
+import { ProductTour } from './product-tour'
 import { RestoreAllDialog } from './restore-all-dialog'
 
 const SORT_MODES: ProductSortMode[] = ['default', 'name', 'category']
@@ -54,45 +48,116 @@ export function GroceryApp() {
   })
   const [selected, setSelected] = useState<Product | null>(null)
   const [adminOpen, setAdminOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [categoryFilterOpen, setCategoryFilterOpen] = useState(false)
   const [categoryFilters, setCategoryFilters] = useState<ReadonlySet<ProductCategory>>(new Set())
   const [restoreAllOpen, setRestoreAllOpen] = useState(false)
   const [duplicatePulse, setDuplicatePulse] = useState('')
   const [enteringProductIds, setEnteringProductIds] = useState<ReadonlySet<string>>(new Set())
   const [toast, setToast] = useState('')
-  const [online, setOnline] = useState(navigator.onLine)
-  const [realtime, setRealtime] = useState('connecting')
-  const [showConnectionWarning, setShowConnectionWarning] = useState(false)
-  const mutationCoordinator = useRef(new ProductMutationCoordinator())
-  const [mutationState, setMutationState] = useState<ProductMutationState>({
-    productIds: new Set(),
-    bulk: false
-  })
+  const [productTourClosed, setProductTourClosed] = useState(false)
+  const previousPendingCount = useRef<number | undefined>(undefined)
+  const previousHouseholdId = useRef<string | undefined>(undefined)
+  const [renderedAt] = useState(() => Date.now())
   const searchRef = useRef<HTMLInputElement>(null)
-  const products = useQuery({
-    queryKey: ['products'],
-    queryFn: ({ signal }) => api.products.list(signal),
+  const householdId = auth.profile?.household_id
+  const locale = i18n.resolvedLanguage ?? i18n.language
+
+  const entitlement = useQuery({
+    queryKey: ['household-entitlement', householdId],
+    queryFn: api.household.entitlement,
+    enabled: Boolean(householdId),
     retry: 1,
     staleTime: 0,
-    gcTime: 0
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: true
   })
-  const connectionWarningEligible =
-    !products.isLoading && !products.isError && (!online || realtime === 'disconnected')
+  const canMutate = entitlement.data?.can_mutate ?? true
+  const showBoundaryBanner = Boolean(
+    entitlement.data?.enforcement_enabled &&
+    entitlement.data.access_state !== 'active_trial' &&
+    entitlement.data.access_state !== 'paid_placeholder' &&
+    entitlement.data.access_state !== 'paid_active'
+  )
+  const subscription = useQuery({
+    queryKey: ['household-subscription', householdId],
+    queryFn: api.household.subscription,
+    enabled: Boolean(householdId && showBoundaryBanner),
+    retry: 1,
+    staleTime: 30_000
+  })
+  const boundaryIsPaid = Boolean(
+    entitlement.data?.access_state === 'paid_active' ||
+    (subscription.data && subscription.data.status !== 'none')
+  )
+  const paidBoundaryNeedsAttention = Boolean(
+    boundaryIsPaid &&
+    entitlement.data?.access_state === 'read_only_grace' &&
+    subscription.data?.current_period_end &&
+    new Date(subscription.data.current_period_end).getTime() > renderedAt &&
+    subscription.data.status !== 'active' &&
+    subscription.data.status !== 'trialing'
+  )
+  const pendingRequests = useQuery({
+    queryKey: ['household-requests', householdId],
+    queryFn: () => api.household.pendingRequests(householdId!),
+    enabled: Boolean(householdId && auth.profile?.role === 'admin'),
+    retry: 1,
+    staleTime: 0
+  })
+  const completeProductTour = useMutation({
+    mutationFn: api.profile.completeProductTour,
+    onSuccess: () => setProductTourClosed(true)
+  })
+
+  const refreshBoundaryQueries = useCallback(() => {
+    if (!householdId) return
+    void client.refetchQueries({ queryKey: ['household-entitlement', householdId], type: 'active' })
+    void client.refetchQueries({
+      queryKey: ['household-subscription', householdId],
+      type: 'active'
+    })
+  }, [client, householdId])
+
+  const grocery = useGroceryList({
+    householdId,
+    canMutate,
+    boundaryIsPaid,
+    paidBoundaryNeedsAttention,
+    search,
+    sortMode,
+    categoryFilters,
+    locale,
+    t,
+    selectedId: selected?.id ?? null,
+    onSelectedChange: setSelected,
+    onEntranceAdded: (productId) =>
+      setEnteringProductIds((current) => new Set(current).add(productId)),
+    onDuplicatePulse: (productId) => {
+      setDuplicatePulse(productId)
+      window.setTimeout(() => setDuplicatePulse(''), 520)
+    },
+    onCreated: () => {
+      setSearch('')
+      searchRef.current?.focus()
+    },
+    onRestoreAllClosed: () => setRestoreAllOpen(false),
+    onRefreshEntitlement: refreshBoundaryQueries,
+    onToast: setToast
+  })
 
   useEffect(() => {
-    const online = () => {
-      setOnline(true)
-      setToast(t('connected'))
-      void client.refetchQueries({ queryKey: ['products'], type: 'active' })
+    const previous = previousHouseholdId.current
+    if (previous !== householdId) {
+      setSelected(null)
+      setAdminOpen(false)
+      setAccountOpen(false)
+      setCategoryFilterOpen(false)
+      setRestoreAllOpen(false)
+      setCategoryFilters(new Set())
+      previousHouseholdId.current = householdId
     }
-    const offline = () => setOnline(false)
-    addEventListener('online', online)
-    addEventListener('offline', offline)
-    return () => {
-      removeEventListener('online', online)
-      removeEventListener('offline', offline)
-    }
-  }, [client, t])
+  }, [householdId])
 
   useEffect(() => {
     if (!toast) return
@@ -101,118 +166,34 @@ export function GroceryApp() {
   }, [toast])
 
   useEffect(() => {
-    const refresher = new TrailingRefresh(
-      () =>
-        client.refetchQueries({ queryKey: ['products'], type: 'active' }, { throwOnError: true }),
-      100
-    )
-    const channel = api.realtime.subscribe(
-      () => refresher.schedule(),
-      (status) => {
-        setRealtime(
-          status === 'SUBSCRIBED'
-            ? 'connected'
-            : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'
-              ? 'disconnected'
-              : 'connecting'
-        )
-        if (status === 'SUBSCRIBED') refresher.runNow()
-      }
-    )
-    return () => {
-      refresher.dispose()
-      void channel.unsubscribe()
+    const count = pendingRequests.data?.length
+    if (count === undefined) return
+    if (previousPendingCount.current !== undefined && count > previousPendingCount.current) {
+      setToast(t('newRequestNotification'))
     }
-  }, [client])
+    previousPendingCount.current = count
+  }, [pendingRequests.data?.length, t])
 
   useEffect(() => {
-    const timeout = window.setTimeout(
-      () => setShowConnectionWarning(connectionWarningEligible),
-      connectionWarningEligible ? 1800 : 0
-    )
-    return () => window.clearTimeout(timeout)
-  }, [connectionWarningEligible])
-
-  const list = useMemo(() => products.data ?? [], [products.data])
-  const selectedProduct = selected
-    ? (list.find((product) => product.id === selected.id) ?? selected)
-    : null
-  const categoryFilterActive =
-    categoryFilters.size > 0 && categoryFilters.size < PRODUCT_CATEGORIES.length
-  const filteredList = useMemo(
-    () =>
-      categoryFilterActive ? list.filter((product) => categoryFilters.has(product.category)) : list,
-    [categoryFilterActive, categoryFilters, list]
-  )
-  const { unpicked, picked } = useMemo(
-    () =>
-      orderProductSections(filteredList, search, sortMode, i18n.resolvedLanguage ?? i18n.language),
-    [filteredList, i18n.language, i18n.resolvedLanguage, search, sortMode]
-  )
-  const signature = duplicateSignature(search)
-  const duplicate = signature
-    ? list.find((product) => product.name_signature === signature)
-    : undefined
-  const canCreate = Boolean(normalizeText(search)) && !duplicate
-
-  async function refreshProducts(productId?: string) {
-    try {
-      await client.refetchQueries(
-        { queryKey: ['products'], type: 'active' },
-        { throwOnError: true }
+    if (!householdId || auth.profile?.role !== 'admin') return
+    const channel = supabase
+      .channel(`household-join-requests:${householdId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'household_join_requests',
+          filter: `household_id=eq.${householdId}`
+        },
+        () => void client.invalidateQueries({ queryKey: ['household-requests', householdId] })
       )
-    } catch {
-      if (productId) {
-        setSelected((current) => (current?.id === productId ? null : current))
-      }
-      return false
+      .subscribe()
+    return () => {
+      void channel.unsubscribe()
     }
-    if (!productId) return
-    const latest = client
-      .getQueryData<Product[]>(['products'])
-      ?.find((product) => product.id === productId)
-    setSelected((current) => (current?.id === productId ? (latest ?? null) : current))
-    return true
-  }
-  async function mutationError(reason: unknown, productId?: string) {
-    setToast(
-      isProductConflict(reason)
-        ? t('conflict')
-        : reason instanceof ApiError
-          ? reason.code === '23505'
-            ? t('duplicate')
-            : reason.code === 'timeout'
-              ? t('timeout')
-              : t('requestFailed')
-          : navigator.onLine
-            ? t('requestFailed')
-            : t('offline')
-    )
-    if (isProductConflict(reason) || (reason instanceof ApiError && reason.code === 'timeout')) {
-      await refreshProducts(productId)
-    }
-  }
-  function syncMutationState() {
-    setMutationState(mutationCoordinator.current.snapshot())
-  }
-  function lockProduct(productId: string) {
-    const locked = mutationCoordinator.current.lockProduct(productId)
-    if (locked) syncMutationState()
-    return locked
-  }
-  function unlockProduct(productId: string) {
-    mutationCoordinator.current.unlockProduct(productId)
-    syncMutationState()
-  }
-  function lockBulk() {
-    const locked = mutationCoordinator.current.lockBulk()
-    if (locked) syncMutationState()
-    return locked
-  }
-  function unlockBulk() {
-    mutationCoordinator.current.unlockBulk()
-    syncMutationState()
-  }
+  }, [auth.profile?.role, client, householdId])
+
   function completeEntrance(productId: string) {
     setEnteringProductIds((current) => {
       if (!current.has(productId)) return current
@@ -221,184 +202,51 @@ export function GroceryApp() {
       return next
     })
   }
-  function replaceProduct(next: Product) {
-    client.setQueryData<Product[]>(['products'], (current = []) =>
-      current.map((product) => (product.id === next.id ? next : product))
-    )
-  }
-  function rollbackProduct(optimistic: Product, previous: Product) {
-    client.setQueryData<Product[]>(['products'], (current = []) =>
-      rollbackOptimisticProduct(current, optimistic, previous)
-    )
-  }
-  const create = useMutation({
-    mutationFn: api.products.create,
-    onSuccess: (product) => {
-      setEnteringProductIds((current) => new Set(current).add(product.id))
-      client.setQueryData<Product[]>(['products'], (current = []) => [
-        product,
-        ...current.filter((item) => item.id !== product.id)
-      ])
-      setSearch('')
-      searchRef.current?.focus()
-    },
-    onError: (reason) => mutationError(reason)
-  })
-  const adjust = useMutation({
-    mutationFn: ({ product, delta }: { product: Product; delta: 1 | -1 }) =>
-      api.products.adjust(product.id, delta, product.version),
-    onMutate: async ({ product, delta }) => {
-      await client.cancelQueries({ queryKey: ['products'] })
-      const previous =
-        client.getQueryData<Product[]>(['products'])?.find((item) => item.id === product.id) ??
-        product
-      const optimistic = {
-        ...previous,
-        quantity: String(Number(previous.quantity) + delta),
-        version: previous.version + 1
-      }
-      replaceProduct(optimistic)
-      return { previous, optimistic }
-    },
-    onSuccess: replaceProduct,
-    onError: async (reason, variables, context) => {
-      if (context) rollbackProduct(context.optimistic, context.previous)
-      await mutationError(reason, variables.product.id)
-    }
-  })
-  const toggle = useMutation({
-    mutationFn: api.products.toggle,
-    onMutate: async (product) => {
-      await client.cancelQueries({ queryKey: ['products'] })
-      const previous =
-        client.getQueryData<Product[]>(['products'])?.find((item) => item.id === product.id) ??
-        product
-      const now = new Date().toISOString()
-      const optimistic = {
-        ...previous,
-        is_picked: !previous.is_picked,
-        picked_at: previous.is_picked ? null : now,
-        ordering_at: now,
-        version: previous.version + 1
-      }
-      replaceProduct(optimistic)
-      return { previous, optimistic }
-    },
-    onSuccess: (next) => {
-      replaceProduct(next)
-      if (selected?.id === next.id) setSelected(next)
-    },
-    onError: async (reason, variables, context) => {
-      if (context) rollbackProduct(context.optimistic, context.previous)
-      await mutationError(reason, variables.id)
-    }
-  })
-  const update = useMutation({
-    mutationFn: ({ product, changes }: { product: Product; changes: ProductChanges }) =>
-      api.products.update(product, changes),
-    onSuccess: (next) => {
-      replaceProduct(next)
-      setSelected(next)
-    },
-    onError: (reason, variables) => mutationError(reason, variables.product.id)
-  })
-  const remove = useMutation({
-    mutationFn: api.products.remove,
-    onSuccess: (_, product) =>
-      client.setQueryData<Product[]>(['products'], (current = []) =>
-        current.filter((item) => item.id !== product.id)
-      ),
-    onError: (reason, product) => mutationError(reason, product.id)
-  })
-  const restoreAll = useMutation({
-    mutationFn: ({
-      clearNotes,
-      resetQuantities
-    }: {
-      clearNotes: boolean
-      resetQuantities: boolean
-    }) => api.products.restoreAll(clearNotes, resetQuantities),
-    onSuccess: (restored) => {
-      const restoredById = new Map(restored.map((product) => [product.id, product]))
-      client.setQueryData<Product[]>(['products'], (current = []) =>
-        current.map((product) => restoredById.get(product.id) ?? product)
-      )
-      setRestoreAllOpen(false)
-    },
-    onError: (reason) => mutationError(reason)
-  })
 
-  function activateCreate() {
-    if (duplicate) {
-      setDuplicatePulse(duplicate.id)
-      setToast(t('duplicate'))
-      setTimeout(() => setDuplicatePulse(''), 520)
-      document
-        .querySelector(`[data-product-id="${duplicate.id}"]`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      return
-    }
-    if (canCreate && !create.isPending) create.mutate(normalizeNameForStorage(search))
-  }
-
-  async function adjustProduct(product: Product, delta: 1 | -1) {
-    if (!lockProduct(product.id)) return
-    try {
-      await adjust.mutateAsync({ product, delta })
-    } catch {
-      // The mutation callback already reconciles and reports the failure.
-    } finally {
-      unlockProduct(product.id)
-    }
-  }
-
-  async function toggleProduct(product: Product) {
-    if (!lockProduct(product.id)) return
-    try {
-      await toggle.mutateAsync(product)
-    } catch {
-      // The mutation callback already reconciles and reports the failure.
-    } finally {
-      unlockProduct(product.id)
-    }
-  }
-
-  async function saveProduct(product: Product, changes: ProductChanges) {
-    if (!lockProduct(product.id)) throw new ApiError('busy', 'Product update already in progress')
-    try {
-      await update.mutateAsync({ product, changes })
-    } finally {
-      unlockProduct(product.id)
-    }
-  }
-
-  async function deleteProduct(product: Product) {
-    if (!lockProduct(product.id)) throw new ApiError('busy', 'Product update already in progress')
-    try {
-      await remove.mutateAsync(product)
-    } finally {
-      unlockProduct(product.id)
-    }
-  }
-
-  async function restoreAllProducts(options: { clearNotes: boolean; resetQuantities: boolean }) {
-    if (!lockBulk()) return
-    try {
-      await restoreAll.mutateAsync(options)
-    } catch {
-      // The mutation callback already reports the failure; the final refresh is authoritative.
-    } finally {
-      try {
-        await refreshProducts()
-      } finally {
-        unlockBulk()
-      }
-    }
-  }
+  const {
+    products,
+    list,
+    unpicked,
+    picked,
+    duplicate,
+    canCreate,
+    categoryFilterActive,
+    mutationState,
+    online,
+    showConnectionWarning,
+    connectionWarningEligible,
+    activateCreate,
+    adjustProduct,
+    toggleProduct,
+    saveProduct,
+    deleteProduct,
+    restoreAllProducts
+  } = grocery
+  const selectedProduct =
+    selected && selected.household_id === householdId
+      ? (list.find((product) => product.id === selected.id) ?? selected)
+      : null
 
   return (
     <main className="app-shell">
-      <AppHeader onAdmin={() => setAdminOpen(true)} />
+      <AppHeader
+        onAccount={() => setAccountOpen(true)}
+        onAdmin={() => setAdminOpen(true)}
+        pendingRequestCount={pendingRequests.data?.length ?? 0}
+      />
+      {showBoundaryBanner && (
+        <div className="entitlement-banner" role="status">
+          {entitlement.data?.access_state === 'read_only_grace'
+            ? boundaryIsPaid
+              ? paidBoundaryNeedsAttention
+                ? t('householdPaidAttention')
+                : t('householdReadOnlyPaid')
+              : t('householdReadOnly')
+            : boundaryIsPaid
+              ? t('householdLockedPaid')
+              : t('householdLocked')}
+        </div>
+      )}
       <section className="list-surface">
         <div className="list-toolbar">
           <div className="search-shell">
@@ -435,6 +283,7 @@ export function GroceryApp() {
                 )}
               </AnimatePresence>
               <button
+                type="button"
                 className="search-add"
                 aria-disabled={!canCreate}
                 aria-label={
@@ -445,6 +294,7 @@ export function GroceryApp() {
                       : t('create', { name: '' })
                 }
                 onClick={activateCreate}
+                disabled={!canCreate}
               >
                 <Plus weight="bold" />
               </button>
@@ -452,6 +302,7 @@ export function GroceryApp() {
           </div>
           {connectionWarningEligible && showConnectionWarning && (
             <button
+              type="button"
               className="connection-banner"
               onClick={() => {
                 void products.refetch()
@@ -499,6 +350,7 @@ export function GroceryApp() {
                 onEntranceComplete={completeEntrance}
                 busyProductIds={mutationState.productIds}
                 bulkBusy={mutationState.bulk}
+                canMutate={canMutate}
                 onEdit={setSelected}
                 onAdjust={adjustProduct}
                 onToggle={toggleProduct}
@@ -511,8 +363,10 @@ export function GroceryApp() {
                 showCount={false}
                 headerAction={
                   <button
+                    type="button"
                     className="icon-button restore-all-button"
                     disabled={
+                      !canMutate ||
                       !list.some((product) => product.is_picked) ||
                       mutationState.bulk ||
                       mutationState.productIds.size > 0
@@ -528,6 +382,7 @@ export function GroceryApp() {
                 onEntranceComplete={completeEntrance}
                 busyProductIds={mutationState.productIds}
                 bulkBusy={mutationState.bulk}
+                canMutate={canMutate}
                 onEdit={setSelected}
                 onAdjust={adjustProduct}
                 onToggle={toggleProduct}
@@ -554,10 +409,14 @@ export function GroceryApp() {
           onSave={saveProduct}
           onDelete={deleteProduct}
           onToggle={toggleProduct}
+          canMutate={canMutate}
+          boundaryIsPaid={boundaryIsPaid}
+          paidBoundaryNeedsAttention={paidBoundaryNeedsAttention}
         />
       )}
+      <AccountDrawer open={accountOpen} onOpenChange={setAccountOpen} />
       {auth.profile?.role === 'admin' && (
-        <AdminDrawer open={adminOpen} onOpenChange={setAdminOpen} />
+        <AdminDrawer open={adminOpen} onOpenChange={setAdminOpen} canMutate={canMutate} />
       )}
       <CategoryFilterDrawer
         open={categoryFilterOpen}
@@ -570,10 +429,23 @@ export function GroceryApp() {
         open={restoreAllOpen}
         onOpenChange={setRestoreAllOpen}
         pending={mutationState.bulk}
+        canMutate={canMutate}
         onConfirm={(options) => void restoreAllProducts(options)}
       />
       <AppToast message={toast} />
       <PwaUpdate />
+      {auth.profile?.household_id &&
+        auth.profile.product_tour_completed_at === null &&
+        !productTourClosed && (
+          <ProductTour
+            key={`${auth.profile.id}-${auth.profile.household_id}`}
+            role={auth.profile.role}
+            onComplete={async () => {
+              await completeProductTour.mutateAsync()
+              if (auth.refreshProfile) await auth.refreshProfile().catch(() => undefined)
+            }}
+          />
+        )}
     </main>
   )
 }
@@ -633,7 +505,15 @@ function AppToast({ message }: { message: string }) {
   )
 }
 
-function AppHeader({ onAdmin }: { onAdmin(): void }) {
+function AppHeader({
+  onAccount,
+  onAdmin,
+  pendingRequestCount
+}: {
+  onAccount(): void
+  onAdmin(): void
+  pendingRequestCount: number
+}) {
   const { t, i18n } = useTranslation()
   const auth = useAuth()
   return (
@@ -643,19 +523,35 @@ function AppHeader({ onAdmin }: { onAdmin(): void }) {
         <h1>{t('appName')}</h1>
       </div>
       <nav>
+        <button type="button" className="icon-button" onClick={onAccount} aria-label={t('account')}>
+          <UserCircle />
+        </button>
         {auth.profile?.role === 'admin' && (
-          <button className="icon-button" onClick={onAdmin} aria-label={t('admin')}>
+          <button
+            type="button"
+            className="icon-button admin-menu-button"
+            onClick={onAdmin}
+            aria-label={t('admin')}
+          >
             <UsersThree />
+            {pendingRequestCount > 0 && (
+              <span className="admin-pending-badge" aria-label={`${pendingRequestCount}`}>
+                {pendingRequestCount}
+              </span>
+            )}
           </button>
         )}
         <button
+          type="button"
           className="language-button"
           onClick={() => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}
+          aria-label={t('language')}
         >
           <Globe />
           {i18n.language === 'he' ? 'EN' : 'עב'}
         </button>
         <button
+          type="button"
           className="icon-button"
           onClick={() => void auth.signOut()}
           aria-label={t('logout')}
@@ -681,7 +577,9 @@ function ErrorState({ onRetry }: { onRetry(): void }) {
   return (
     <div className="empty-state">
       <p>{t('requestFailed')}</p>
-      <button onClick={onRetry}>{t('confirm')}</button>
+      <Button type="button" variant="secondary" onClick={onRetry}>
+        {t('retry')}
+      </Button>
     </div>
   )
 }
@@ -701,7 +599,9 @@ function PwaUpdate() {
           exit={{ opacity: 0, y: 8 }}
         >
           <span>{t('updateReady')}</span>
-          <button onClick={() => void updateServiceWorker(true)}>{t('update')}</button>
+          <button type="button" onClick={() => void updateServiceWorker(true)}>
+            {t('update')}
+          </button>
         </motion.aside>
       )}
     </AnimatePresence>

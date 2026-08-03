@@ -35,7 +35,7 @@ describe('RestoreAllDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
 
     expect(onConfirm).toHaveBeenCalledWith({ clearNotes: true, resetQuantities: true })
-    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveClass('button')
+    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveAttribute('data-slot', 'button')
   })
 
   it('keeps both options off by default', async () => {

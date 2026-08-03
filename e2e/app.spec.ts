@@ -7,7 +7,9 @@ async function login(page: Page) {
   await page.getByLabel(/email|אימייל/i).fill(admin.email)
   await page.getByLabel(/password|סיסמה/i).fill(admin.password)
   await page.getByRole('button', { name: /sign in|כניסה/i }).click()
-  await expect(page.getByRole('heading', { name: /our groceries|הקניות שלנו/i })).toBeVisible()
+  await expect(
+    page.getByRole('textbox', { name: /find or add a product|חיפוש או הוספת מוצר/i })
+  ).toBeVisible()
 }
 
 test('primary buttons use the intended foreground color', async ({ page }) => {

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api, isProductConflict } from '../lib/api'
+import { api, isApiErrorCode, isProductConflict } from '../lib/api'
 import { PRODUCT_CATEGORIES } from '../lib/product-category'
 import {
   duplicateSignature,
@@ -26,7 +26,10 @@ export function ProductDrawer({
   onSave,
   onDelete,
   onToggle,
-  pending
+  pending,
+  canMutate = true,
+  boundaryIsPaid = false,
+  paidBoundaryNeedsAttention = false
 }: {
   product: Product
   authoritativeProduct?: Product
@@ -37,6 +40,9 @@ export function ProductDrawer({
   onDelete(product: Product): Promise<void>
   onToggle(product: Product): void
   pending: boolean
+  canMutate?: boolean
+  boundaryIsPaid?: boolean
+  paidBoundaryNeedsAttention?: boolean
 }) {
   const { t } = useTranslation()
   const productValues = {
@@ -77,6 +83,7 @@ export function ProductDrawer({
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError('')
+    if (!canMutate) return
     try {
       await onSave(product, {
         name: normalizeNameForStorage(values.name),
@@ -88,7 +95,21 @@ export function ProductDrawer({
       setCategoryEdit(null)
       onOpenChange(false)
     } catch (reason) {
-      setError(isProductConflict(reason) ? t('conflict') : t('requestFailed'))
+      setError(
+        isProductConflict(reason)
+          ? t('conflict')
+          : isApiErrorCode(reason, 'household_read_only')
+            ? boundaryIsPaid
+              ? paidBoundaryNeedsAttention
+                ? t('householdPaidAttention')
+                : t('householdReadOnlyPaid')
+              : t('householdReadOnly')
+            : isApiErrorCode(reason, 'household_entitlement_locked')
+              ? boundaryIsPaid
+                ? t('householdLockedPaid')
+                : t('householdLocked')
+              : t('requestFailed')
+      )
     }
   }
 
@@ -101,9 +122,10 @@ export function ProductDrawer({
         className="product-drawer"
         headerAction={
           <button
+            type="button"
             className="icon-button danger-quiet"
             onClick={() => setDeleteOpen(true)}
-            disabled={pending}
+            disabled={pending || !canMutate}
             aria-label={t('delete')}
           >
             <Trash />
@@ -114,8 +136,7 @@ export function ProductDrawer({
             className="drawer-save"
             type="submit"
             form={formId}
-            size="lg"
-            disabled={!dirty || Boolean(validation) || pending}
+            disabled={!dirty || Boolean(validation) || pending || !canMutate}
           >
             {pending ? t('saving') : t('save')}
           </Button>
@@ -144,6 +165,7 @@ export function ProductDrawer({
             <input
               value={values.name}
               onChange={(event) => setValues({ ...values, name: event.target.value })}
+              disabled={pending || !canMutate}
               maxLength={PRODUCT_NAME_MAX * 2}
             />
           </label>
@@ -157,12 +179,14 @@ export function ProductDrawer({
               step="0.01"
               value={values.quantity}
               onChange={(event) => setValues({ ...values, quantity: event.target.value })}
+              disabled={pending || !canMutate}
             />
           </label>
           <label>
             <span>{t('category')}</span>
             <select
               value={category}
+              disabled={pending || !canMutate}
               onChange={(event) =>
                 setCategoryEdit(
                   PRODUCT_CATEGORIES.find((category) => category === event.target.value) ?? 'other'
@@ -183,13 +207,14 @@ export function ProductDrawer({
             <span className="textarea-shell">
               <textarea
                 value={values.notes}
+                disabled={pending || !canMutate}
                 onChange={(event) => setValues({ ...values, notes: event.target.value })}
                 rows={4}
               />
               <button
                 type="button"
                 className="clear-notes-button"
-                disabled={!values.notes}
+                disabled={!values.notes || pending || !canMutate}
                 onClick={() => setValues({ ...values, notes: '' })}
                 aria-label={t('clearProductNotes')}
               >
@@ -208,8 +233,7 @@ export function ProductDrawer({
           <Button
             type="button"
             variant="secondary"
-            size="lg"
-            disabled={pending}
+            disabled={pending || !canMutate}
             onClick={() => onToggle(product)}
           >
             {product.is_picked ? t('restore') : t('pick')}
@@ -223,8 +247,9 @@ export function ProductDrawer({
         body={t('deleteBody')}
         confirmLabel={t('delete')}
         destructive
-        pending={pending}
+        pending={pending || !canMutate}
         onConfirm={() => {
+          if (!canMutate) return
           void onDelete(product)
             .then(() => {
               setDeleteOpen(false)

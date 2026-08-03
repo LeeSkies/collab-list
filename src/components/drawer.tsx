@@ -4,6 +4,8 @@ import { X } from '@phosphor-icons/react'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from './ui/button'
+
 export function AppDrawer({
   open,
   onOpenChange,
@@ -157,17 +159,17 @@ export function ConfirmDialog({
             <Dialog.Title>{title}</Dialog.Title>
             <Dialog.Description>{body}</Dialog.Description>
             <div className="confirm-actions">
-              <Dialog.Close className="button secondary" disabled={pending}>
+              <Dialog.Close render={<Button variant="secondary" />} disabled={pending}>
                 {t('cancel')}
               </Dialog.Close>
               {destructive ? (
-                <button className="button danger" disabled={pending} onClick={onConfirm}>
+                <Button variant="destructive" disabled={pending} onClick={onConfirm}>
                   {confirmLabel}
-                </button>
+                </Button>
               ) : (
-                <button className="button" disabled={pending} onClick={onConfirm}>
+                <Button disabled={pending} onClick={onConfirm}>
                   {confirmLabel}
-                </button>
+                </Button>
               )}
             </div>
           </Dialog.Popup>
@@ -185,7 +187,9 @@ export function ChoiceDialog({
   confirmLabel,
   children,
   onConfirm,
-  pending = false
+  pending = false,
+  confirmDisabled = false,
+  destructive = false
 }: {
   open: boolean
   onOpenChange(open: boolean): void
@@ -195,6 +199,8 @@ export function ChoiceDialog({
   children: ReactNode
   onConfirm(): void
   pending?: boolean
+  confirmDisabled?: boolean
+  destructive?: boolean
 }) {
   const { t } = useTranslation()
   return (
@@ -207,10 +213,14 @@ export function ChoiceDialog({
             <Dialog.Description>{body}</Dialog.Description>
             <div className="choice-dialog-options">{children}</div>
             <div className="confirm-actions">
-              <Dialog.Close className="button secondary">{t('cancel')}</Dialog.Close>
-              <button className="button" disabled={pending} onClick={onConfirm}>
+              <Dialog.Close render={<Button variant="secondary" />}>{t('cancel')}</Dialog.Close>
+              <Button
+                variant={destructive ? 'destructive' : 'default'}
+                disabled={pending || confirmDisabled}
+                onClick={onConfirm}
+              >
                 {confirmLabel}
-              </button>
+              </Button>
             </div>
           </Dialog.Popup>
         </Dialog.Viewport>

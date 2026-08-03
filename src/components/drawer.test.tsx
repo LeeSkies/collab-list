@@ -43,8 +43,28 @@ describe('ConfirmDialog', () => {
     )
 
     const confirm = screen.getByRole('button', { name: 'Discard' })
-    expect(confirm).toHaveClass('button')
-    expect(confirm).not.toHaveAttribute('data-slot')
+    expect(confirm).toHaveAttribute('data-slot', 'button')
+  })
+
+  it('composes the cancel action through the shared Button', () => {
+    render(
+      <I18nextProvider i18n={i18n}>
+        <ConfirmDialog
+          open
+          onOpenChange={() => undefined}
+          title="Discard changes?"
+          body="Unsaved changes"
+          confirmLabel="Discard"
+          onConfirm={() => undefined}
+          pending
+        />
+      </I18nextProvider>
+    )
+
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    expect(cancel).toHaveAttribute('data-slot', 'button')
+    expect(cancel).toHaveAttribute('type', 'button')
+    expect(cancel).toBeDisabled()
   })
 })
 

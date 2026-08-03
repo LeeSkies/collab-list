@@ -108,4 +108,52 @@ describe('HoldToRevealName', () => {
     expect(tooltip.querySelector('strong')).toHaveTextContent('Milk')
     expect(tooltip.querySelector('span')).toHaveTextContent('Only if it is on sale')
   })
+
+  it('stops a pending hold when the pointer is cancelled before the timer fires', () => {
+    const name = renderTruncatedName()
+    fireEvent.pointerDown(name, {
+      pointerId: 6,
+      isPrimary: true,
+      button: 0,
+      clientX: 20,
+      clientY: 20
+    })
+    fireEvent.pointerCancel(window, { pointerId: 6, clientX: 20, clientY: 20 })
+    // Even well past the hold delay, no tooltip appears.
+    act(() => vi.advanceTimersByTime(500))
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('cancels the long press on a diagonal swipe away from the start point', () => {
+    const name = renderTruncatedName()
+    fireEvent.pointerDown(name, {
+      pointerId: 7,
+      isPrimary: true,
+      button: 0,
+      clientX: 20,
+      clientY: 20
+    })
+    fireEvent.pointerMove(window, { pointerId: 7, clientX: 28, clientY: 28 })
+    act(() => vi.advanceTimersByTime(500))
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('cleans up pointer listeners and the timer on unmount', () => {
+    const view = render(<HoldToRevealName name="Milk" />)
+    const name = view.container.querySelector('.hold-name')!
+    fireEvent.pointerDown(name, {
+      pointerId: 8,
+      isPrimary: true,
+      button: 0,
+      clientX: 20,
+      clientY: 20
+    })
+
+    view.unmount()
+    act(() => vi.advanceTimersByTime(500))
+    // No timer fires and no listener error is thrown after unmount.
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
 })

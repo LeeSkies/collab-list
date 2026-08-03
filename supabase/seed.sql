@@ -12,6 +12,43 @@ values
 on conflict (provider_id, provider) do nothing;
 
 update public.profiles set role = 'admin' where email = 'admin@example.com';
+update public.profiles
+set product_tour_completed_at = coalesce(product_tour_completed_at, now())
+where email in ('admin@example.com', 'member@example.com');
+
+insert into public.households(name)
+select 'Local household'
+where not exists (select 1 from public.households);
+
+insert into public.household_trials(household_id, starts_at, ends_at)
+select household.id, household.created_at, household.created_at + interval '14 days'
+from public.households as household
+on conflict (household_id) do nothing;
+
+insert into public.household_entitlements(household_id)
+select household.id from public.households as household
+on conflict (household_id) do nothing;
+
+insert into public.household_members(household_id, user_id, role)
+select
+  (select id from public.households order by created_at, id limit 1),
+  p.id,
+  case when p.email = 'admin@example.com' then 'admin' else 'member' end
+from public.profiles as p
+where p.email in ('admin@example.com', 'member@example.com')
+on conflict (user_id) do nothing;
+
+update public.account_trial_eligibility as eligibility
+set owned_household_id = membership.household_id,
+    owned_trial_started_at = household.created_at,
+    eligibility_consumed_at = coalesce(eligibility.eligibility_consumed_at, now())
+from public.household_members as membership
+join public.households as household on household.id = membership.household_id
+join public.profiles as profile on profile.id = membership.user_id
+where membership.role = 'admin'
+  and profile.email = 'admin@example.com'
+  and eligibility.user_id = membership.user_id
+  and eligibility.owned_household_id is null;
 
 begin;
 set local role authenticated;

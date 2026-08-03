@@ -10,14 +10,24 @@ import type { Product } from '../lib/types'
 import { GroceryApp } from './grocery-app'
 import { ProductSection } from './product-section'
 
-vi.mock('../auth', () => ({
-  useAuth: () => ({
-    profile: { role: 'member' },
+const { authState } = vi.hoisted(() => ({
+  authState: {
+    profile: {
+      role: 'member' as 'admin' | 'member',
+      household_id: '20000000-0000-0000-0000-000000000001',
+      product_tour_completed_at: undefined as string | null | undefined
+    },
+    refreshProfile: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn()
-  })
+  }
+}))
+
+vi.mock('../auth', () => ({
+  useAuth: () => authState
 }))
 
 const boughtProduct: Product = {
+  household_id: '20000000-0000-0000-0000-000000000001',
   id: '10000000-0000-0000-0000-000000000003',
   name: 'Milk',
   name_signature: '4:milk',
@@ -65,10 +75,37 @@ function buildProductSection(
 }
 
 afterEach(async () => {
+  authState.profile = {
+    role: 'member',
+    household_id: '20000000-0000-0000-0000-000000000001',
+    product_tour_completed_at: undefined
+  }
   localStorage.removeItem('grocery-sort-mode')
   await i18n.changeLanguage('en')
+  authState.refreshProfile.mockReset().mockResolvedValue(undefined)
   vi.restoreAllMocks()
   vi.useRealTimers()
+})
+
+describe('GroceryApp account access', () => {
+  it('opens the account drawer for regular members', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Account' }))
+    expect(screen.getByRole('heading', { name: 'Account' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Send confirmation email' })).toBeVisible()
+  })
 })
 
 describe('GroceryApp sorting', () => {
@@ -308,6 +345,65 @@ describe('GroceryApp category filtering', () => {
 })
 
 describe('GroceryApp realtime categories', () => {
+  it('scopes query and realtime state to the authenticated household', async () => {
+    const user = userEvent.setup()
+    const secondHouseholdId = '20000000-0000-0000-0000-000000000002'
+    const secondHouseholdProduct = {
+      ...newProduct,
+      household_id: secondHouseholdId,
+      name: 'Bread'
+    }
+    vi.spyOn(api.products, 'list').mockImplementation(async () =>
+      authState.profile.household_id === secondHouseholdId
+        ? [secondHouseholdProduct]
+        : [boughtProduct]
+    )
+    const unsubscribe = vi.fn()
+    const subscribe = vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Edit Milk' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Edit Milk' }))
+    expect(screen.getByRole('dialog')).toBeVisible()
+    expect(client.getQueryData(['products'])).toBeUndefined()
+    expect(client.getQueryData(['products', boughtProduct.household_id])).toEqual([boughtProduct])
+    expect(subscribe).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      boughtProduct.household_id
+    )
+
+    authState.profile = {
+      role: 'member',
+      household_id: secondHouseholdId,
+      product_tour_completed_at: undefined
+    }
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Edit Bread' })).toBeVisible()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    expect(subscribe).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      secondHouseholdId
+    )
+    expect(client.getQueryData(['products', secondHouseholdId])).toEqual([secondHouseholdProduct])
+  })
+
   it('reconciles an open drawer with an authoritative category refetch', async () => {
     const user = userEvent.setup()
     const refreshedProduct = { ...boughtProduct, category: 'pantry' as const, version: 2 }
@@ -322,6 +418,7 @@ describe('GroceryApp realtime categories', () => {
       name: 'Lee',
       email: 'admin@example.com',
       role: 'admin',
+      product_tour_completed_at: '2026-08-05T12:00:00.000Z',
       created_at: boughtProduct.created_at,
       updated_at: boughtProduct.updated_at
     })
@@ -354,6 +451,540 @@ describe('GroceryApp realtime categories', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Someone changed this product')
     expect(update.mock.calls[0]?.[0].version).toBe(1)
     expect(category).toHaveValue('snacks')
+  })
+})
+
+describe('GroceryApp quantity reconciliation', () => {
+  it('does not let a stale quantity success reverse a newer authoritative revision', async () => {
+    const user = userEvent.setup()
+    const authoritative = { ...newProduct, quantity: '3.00', version: 3 }
+    vi.spyOn(api.products, 'list')
+      .mockResolvedValueOnce([newProduct])
+      .mockResolvedValue([authoritative])
+    let resolveAdjust!: (product: Product) => void
+    const staleAdjust = new Promise<Product>((resolve) => {
+      resolveAdjust = resolve
+    })
+    const adjust = vi.spyOn(api.products, 'adjust').mockReturnValue(staleAdjust)
+    let onProductChange: () => void = () => undefined
+    vi.spyOn(api.realtime, 'subscribe').mockImplementation((onChange) => {
+      onProductChange = onChange
+      return { unsubscribe: vi.fn() } as never
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Increase quantity' }))
+    expect(adjust).toHaveBeenCalledWith(newProduct.id, 1, newProduct.version)
+
+    // A peer's authoritative change lands while the quantity RPC is still in flight.
+    onProductChange()
+    await waitFor(() => {
+      expect(client.getQueryData(['products', newProduct.household_id])).toEqual([authoritative])
+    })
+
+    // The slow local RPC resolves with a stale revision afterwards.
+    resolveAdjust({ ...newProduct, quantity: '2.00', version: 2 })
+    await waitFor(() => {
+      expect(client.getQueryData(['products', newProduct.household_id])).toEqual([authoritative])
+    })
+  })
+})
+
+describe('GroceryApp CRUD reconciliation', () => {
+  it('does not let a stale drawer save reverse a newer authoritative revision', async () => {
+    const user = userEvent.setup()
+    const authoritative = { ...newProduct, quantity: '3.00', version: 3 }
+    vi.spyOn(api.products, 'list')
+      .mockResolvedValueOnce([newProduct])
+      .mockResolvedValue([authoritative])
+    let resolveUpdate!: (product: Product) => void
+    const staleUpdate = new Promise<Product>((resolve) => {
+      resolveUpdate = resolve
+    })
+    const update = vi.spyOn(api.products, 'update').mockReturnValue(staleUpdate)
+    let onProductChange: () => void = () => undefined
+    vi.spyOn(api.realtime, 'subscribe').mockImplementation((onChange) => {
+      onProductChange = onChange
+      return { unsubscribe: vi.fn() } as never
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Bread' }))
+    const category = await screen.findByRole('combobox', { name: 'Category' })
+    await user.selectOptions(category, 'snacks')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(update).toHaveBeenCalled()
+
+    // A peer's authoritative change lands while the drawer save is in flight.
+    onProductChange()
+    await waitFor(() => {
+      expect(client.getQueryData(['products', newProduct.household_id])).toEqual([authoritative])
+    })
+
+    // The slow drawer save resolves with a stale revision afterwards.
+    resolveUpdate({ ...newProduct, quantity: '2.00', version: 2 })
+    await waitFor(() => {
+      expect(client.getQueryData(['products', newProduct.household_id])).toEqual([authoritative])
+    })
+  })
+})
+
+describe('GroceryApp product tour', () => {
+  it('shows a new member tour after household entry and does not reopen after completion', async () => {
+    const user = userEvent.setup()
+    authState.profile = {
+      role: 'member',
+      household_id: boughtProduct.household_id,
+      product_tour_completed_at: null
+    }
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const completedAt = '2026-08-05T12:00:00.000Z'
+    const complete = vi.spyOn(api.profile, 'completeProductTour').mockImplementation(async () => {
+      authState.profile.product_tour_completed_at = completedAt
+      return completedAt
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Find anything quickly' })).toBeVisible()
+    expect(screen.getByText('Step 1 of 4')).toBeVisible()
+    expect(
+      screen.queryByRole('heading', { name: 'Manage household members' })
+    ).not.toBeInTheDocument()
+    for (let step = 0; step < 4; step += 1) {
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+    }
+    await waitFor(() => expect(complete).toHaveBeenCalledOnce())
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    view.unmount()
+    const nextClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={nextClient}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('gives admins the member-management step', async () => {
+    const user = userEvent.setup()
+    authState.profile = {
+      role: 'admin',
+      household_id: boughtProduct.household_id,
+      product_tour_completed_at: null
+    }
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    for (let step = 0; step < 4; step += 1) {
+      await user.click(await screen.findByRole('button', { name: 'Next' }))
+    }
+    expect(await screen.findByRole('heading', { name: 'Manage household members' })).toBeVisible()
+    expect(screen.getByText('Step 5 of 5')).toBeVisible()
+  })
+})
+
+describe('GroceryApp entitlement banner', () => {
+  it('shows paid-specific messaging when a subscription ends', async () => {
+    await i18n.changeLanguage('en')
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    vi.spyOn(api.household, 'entitlement').mockResolvedValue({
+      household_id: boughtProduct.household_id,
+      access_state: 'read_only_grace',
+      trial_starts_at: null,
+      trial_ends_at: null,
+      grace_ends_at: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+      seat_limit: 5,
+      enforcement_enabled: true,
+      can_mutate: false,
+      reads_available: true
+    })
+    vi.spyOn(api.household, 'subscription').mockResolvedValue({
+      household_id: boughtProduct.household_id,
+      status: 'unpaid',
+      provider: 'stripe',
+      provider_subscription_id: 'sub_1',
+      current_period_start: new Date(Date.now() - 8 * 86_400_000).toISOString(),
+      current_period_end: new Date(Date.now() - 1 * 86_400_000).toISOString(),
+      grace_ends_at: new Date(Date.now() + 6 * 86_400_000).toISOString(),
+      cancel_at_period_end: true,
+      canceled_at: null,
+      base_seat_allowance: 5,
+      add_on_seat_count: 0,
+      add_on_unit_amount_minor_units: null,
+      currency: null,
+      provider_event_id: null,
+      active_member_count: 2,
+      billed_seat_count: 0,
+      billing_enabled: true
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(
+      await screen.findByText(
+        'Your subscription has ended. The list is available to read during the seven-day grace period.'
+      )
+    ).toBeVisible()
+    expect(screen.queryByText(/^Your trial has ended/)).not.toBeInTheDocument()
+  })
+
+  it.each(['canceled', 'paused', 'past_due'] as const)(
+    'uses the same attention copy for a future-period paid %s boundary',
+    async (status) => {
+      await i18n.changeLanguage('en')
+      vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+      vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+      vi.spyOn(api.household, 'entitlement').mockResolvedValue({
+        household_id: boughtProduct.household_id,
+        access_state: 'read_only_grace',
+        trial_starts_at: null,
+        trial_ends_at: null,
+        grace_ends_at: new Date(Date.now() + 37 * 86_400_000).toISOString(),
+        seat_limit: 5,
+        enforcement_enabled: true,
+        can_mutate: false,
+        reads_available: true
+      })
+      vi.spyOn(api.household, 'subscription').mockResolvedValue({
+        household_id: boughtProduct.household_id,
+        status,
+        provider: 'stripe',
+        provider_subscription_id: 'sub_1',
+        current_period_start: new Date(Date.now() - 86_400_000).toISOString(),
+        current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        grace_ends_at: new Date(Date.now() + 37 * 86_400_000).toISOString(),
+        cancel_at_period_end: false,
+        canceled_at: null,
+        base_seat_allowance: 5,
+        add_on_seat_count: 0,
+        add_on_unit_amount_minor_units: null,
+        currency: null,
+        provider_event_id: null,
+        active_member_count: 2,
+        billed_seat_count: 0,
+        billing_enabled: true
+      })
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      render(
+        <QueryClientProvider client={client}>
+          <I18nextProvider i18n={i18n}>
+            <GroceryApp />
+          </I18nextProvider>
+        </QueryClientProvider>
+      )
+
+      expect(
+        await screen.findByText(
+          'Your subscription requires attention. The list remains available to read, but changes are unavailable.'
+        )
+      ).toBeVisible()
+      expect(screen.queryByText(/^Your subscription has ended/)).not.toBeInTheDocument()
+    }
+  )
+
+  it('keeps the trial messaging for a trial household in grace and shows no banner for paid active', async () => {
+    await i18n.changeLanguage('en')
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    vi.spyOn(api.household, 'entitlement').mockResolvedValue({
+      household_id: boughtProduct.household_id,
+      access_state: 'read_only_grace',
+      trial_starts_at: '2026-07-01T12:00:00Z',
+      trial_ends_at: '2026-07-15T12:00:00Z',
+      grace_ends_at: '2026-07-22T12:00:00Z',
+      seat_limit: 5,
+      enforcement_enabled: true,
+      can_mutate: false,
+      reads_available: true
+    })
+    vi.spyOn(api.household, 'subscription').mockResolvedValue({
+      household_id: boughtProduct.household_id,
+      status: 'none',
+      provider: null,
+      provider_subscription_id: null,
+      current_period_start: null,
+      current_period_end: null,
+      grace_ends_at: null,
+      cancel_at_period_end: false,
+      canceled_at: null,
+      base_seat_allowance: 5,
+      add_on_seat_count: 0,
+      add_on_unit_amount_minor_units: null,
+      currency: null,
+      provider_event_id: null,
+      active_member_count: 2,
+      billed_seat_count: 0,
+      billing_enabled: false
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(
+      await screen.findByText(
+        'Your trial has ended. The list is available to read during the seven-day grace period.'
+      )
+    ).toBeVisible()
+  })
+
+  it('uses paid-specific copy for a mutation rejected on a paid locked boundary', async () => {
+    await i18n.changeLanguage('en')
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    // Simulates the stale-client race: the client still allows mutations while
+    // the server has already moved a paid household to the locked boundary.
+    vi.spyOn(api.household, 'entitlement').mockResolvedValue({
+      household_id: boughtProduct.household_id,
+      access_state: 'read_only_grace',
+      trial_starts_at: null,
+      trial_ends_at: null,
+      grace_ends_at: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+      seat_limit: 5,
+      enforcement_enabled: true,
+      can_mutate: true,
+      reads_available: true
+    })
+    vi.spyOn(api.household, 'subscription').mockResolvedValue({
+      household_id: boughtProduct.household_id,
+      status: 'canceled',
+      provider: 'stripe',
+      provider_subscription_id: 'sub_1',
+      current_period_start: new Date(Date.now() - 8 * 86_400_000).toISOString(),
+      current_period_end: new Date(Date.now() - 1 * 86_400_000).toISOString(),
+      grace_ends_at: new Date(Date.now() + 6 * 86_400_000).toISOString(),
+      cancel_at_period_end: true,
+      canceled_at: new Date(Date.now() - 1 * 86_400_000).toISOString(),
+      base_seat_allowance: 5,
+      add_on_seat_count: 0,
+      add_on_unit_amount_minor_units: null,
+      currency: null,
+      provider_event_id: null,
+      active_member_count: 2,
+      billed_seat_count: 0,
+      billing_enabled: true
+    })
+    const create = vi
+      .spyOn(api.products, 'create')
+      .mockRejectedValue(new ApiError('42501', 'household_entitlement_locked'))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(
+      await screen.findByText(
+        'Your subscription has ended. The list is available to read during the seven-day grace period.'
+      )
+    ).toBeVisible()
+    await userEvent.type(screen.getByPlaceholderText('Find or add a product'), 'Coffee')
+    await userEvent.click(screen.getByRole('button', { name: 'Add Coffee' }))
+
+    const paidCopy =
+      'Your subscription has ended. The list remains available to read, but changes are unavailable.'
+    await waitFor(() => {
+      const toast = screen
+        .queryAllByRole('status')
+        .find(
+          (message) => message.classList.contains('app-toast') && message.textContent === paidCopy
+        )
+      expect(toast).toBeDefined()
+      expect(toast).toBeVisible()
+      expect(toast).toHaveStyle({ opacity: '1' })
+    })
+    expect(create).toHaveBeenCalled()
+  })
+
+  it('uses paid copy and refreshes subscription after a paid-active stale transition', async () => {
+    await i18n.changeLanguage('en')
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const paidEntitlement = {
+      household_id: boughtProduct.household_id,
+      access_state: 'paid_active' as const,
+      trial_starts_at: null,
+      trial_ends_at: null,
+      grace_ends_at: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+      seat_limit: 5,
+      enforcement_enabled: true,
+      can_mutate: true,
+      reads_available: true
+    }
+    const lockedEntitlement = {
+      ...paidEntitlement,
+      access_state: 'unavailable_locked' as const,
+      can_mutate: false
+    }
+    vi.spyOn(api.household, 'entitlement')
+      .mockResolvedValueOnce(paidEntitlement)
+      .mockResolvedValue(lockedEntitlement)
+    const subscription = vi.spyOn(api.household, 'subscription').mockResolvedValue({
+      household_id: boughtProduct.household_id,
+      status: 'canceled',
+      provider: 'stripe',
+      provider_subscription_id: 'sub_1',
+      current_period_start: new Date(Date.now() - 8 * 86_400_000).toISOString(),
+      current_period_end: new Date(Date.now() - 1 * 86_400_000).toISOString(),
+      grace_ends_at: new Date(Date.now() + 6 * 86_400_000).toISOString(),
+      cancel_at_period_end: true,
+      canceled_at: new Date(Date.now() - 1 * 86_400_000).toISOString(),
+      base_seat_allowance: 5,
+      add_on_seat_count: 0,
+      add_on_unit_amount_minor_units: null,
+      currency: null,
+      provider_event_id: null,
+      active_member_count: 2,
+      billed_seat_count: 0,
+      billing_enabled: true
+    })
+    const create = vi
+      .spyOn(api.products, 'create')
+      .mockRejectedValue(new ApiError('42501', 'household_entitlement_locked'))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    await waitFor(() => expect(subscription).not.toHaveBeenCalled())
+    await userEvent.type(screen.getByPlaceholderText('Find or add a product'), 'Coffee')
+    await userEvent.click(screen.getByRole('button', { name: 'Add Coffee' }))
+
+    const paidCopy =
+      'Your subscription has ended. The list remains available to read, but changes are unavailable.'
+    await waitFor(() => {
+      const toast = screen
+        .queryAllByRole('status')
+        .find(
+          (message) => message.classList.contains('app-toast') && message.textContent === paidCopy
+        )
+      expect(toast).toBeDefined()
+      expect(toast).toBeVisible()
+      expect(toast).toHaveStyle({ opacity: '1' })
+    })
+    expect(subscription).toHaveBeenCalled()
+    expect(create).toHaveBeenCalled()
+  })
+
+  it('keeps trial-specific copy for a mutation rejected on a trial locked boundary', async () => {
+    await i18n.changeLanguage('en')
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    vi.spyOn(api.household, 'entitlement').mockResolvedValue({
+      household_id: boughtProduct.household_id,
+      access_state: 'unavailable_locked',
+      trial_starts_at: '2026-07-01T12:00:00Z',
+      trial_ends_at: '2026-07-15T12:00:00Z',
+      grace_ends_at: '2026-07-22T12:00:00Z',
+      seat_limit: 5,
+      enforcement_enabled: true,
+      can_mutate: true,
+      reads_available: true
+    })
+    vi.spyOn(api.household, 'subscription').mockResolvedValue({
+      household_id: boughtProduct.household_id,
+      status: 'none',
+      provider: null,
+      provider_subscription_id: null,
+      current_period_start: null,
+      current_period_end: null,
+      grace_ends_at: null,
+      cancel_at_period_end: false,
+      canceled_at: null,
+      base_seat_allowance: 5,
+      add_on_seat_count: 0,
+      add_on_unit_amount_minor_units: null,
+      currency: null,
+      provider_event_id: null,
+      active_member_count: 2,
+      billed_seat_count: 0,
+      billing_enabled: false
+    })
+    const create = vi
+      .spyOn(api.products, 'create')
+      .mockRejectedValue(new ApiError('42501', 'household_entitlement_locked'))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(
+      await screen.findByText(
+        'Your trial has ended. The list remains available to read, but changes are unavailable.'
+      )
+    ).toBeVisible()
+    await userEvent.type(screen.getByPlaceholderText('Find or add a product'), 'Coffee')
+    await userEvent.click(screen.getByRole('button', { name: 'Add Coffee' }))
+
+    expect(create).toHaveBeenCalled()
+    expect(screen.queryByText(/^Your subscription has ended/)).not.toBeInTheDocument()
   })
 })
 

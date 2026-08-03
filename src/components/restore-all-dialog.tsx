@@ -12,12 +12,14 @@ export function RestoreAllDialog({
   open,
   onOpenChange,
   onConfirm,
-  pending
+  pending,
+  canMutate = true
 }: {
   open: boolean
   onOpenChange(open: boolean): void
   onConfirm(options: RestoreAllOptions): void
   pending: boolean
+  canMutate?: boolean
 }) {
   const { t } = useTranslation()
   const [clearNotes, setClearNotes] = useState(false)
@@ -38,14 +40,23 @@ export function RestoreAllDialog({
       title={t('restoreAllTitle')}
       body={t('restoreAllBody')}
       confirmLabel={t('confirm')}
-      pending={pending}
-      onConfirm={() => onConfirm({ clearNotes, resetQuantities })}
+      pending={pending || !canMutate}
+      confirmDisabled={!canMutate}
+      onConfirm={() => {
+        if (canMutate) onConfirm({ clearNotes, resetQuantities })
+      }}
     >
-      <SwitchOption checked={clearNotes} onCheckedChange={setClearNotes} label={t('clearNotes')} />
+      <SwitchOption
+        checked={clearNotes}
+        onCheckedChange={setClearNotes}
+        label={t('clearNotes')}
+        disabled={!canMutate}
+      />
       <SwitchOption
         checked={resetQuantities}
         onCheckedChange={setResetQuantities}
         label={t('resetQuantities')}
+        disabled={!canMutate}
       />
     </ChoiceDialog>
   )
@@ -54,16 +65,18 @@ export function RestoreAllDialog({
 function SwitchOption({
   checked,
   onCheckedChange,
-  label
+  label,
+  disabled = false
 }: {
   checked: boolean
   onCheckedChange(checked: boolean): void
   label: string
+  disabled?: boolean
 }) {
   return (
     <label className="switch-option">
       <span>{label}</span>
-      <Switch.Root checked={checked} onCheckedChange={onCheckedChange}>
+      <Switch.Root checked={checked} onCheckedChange={onCheckedChange} disabled={disabled}>
         <Switch.Thumb />
       </Switch.Root>
     </label>

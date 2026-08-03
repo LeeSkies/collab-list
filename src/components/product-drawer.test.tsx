@@ -4,11 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 import type { Product } from '../lib/types'
 import { ProductDrawer } from './product-drawer'
 
 const product: Product = {
+  household_id: '20000000-0000-0000-0000-000000000001',
   id: '10000000-0000-0000-0000-000000000003',
   name: 'Milk',
   name_signature: '4:milk',
@@ -25,12 +26,16 @@ const product: Product = {
   updated_at: '2026-07-13T12:00:00.000Z'
 }
 
-function renderDrawer(onSave = vi.fn().mockResolvedValue(undefined)) {
+function renderDrawer(
+  onSave = vi.fn().mockResolvedValue(undefined),
+  props: Partial<Parameters<typeof ProductDrawer>[0]> = {}
+) {
   vi.spyOn(api.profile, 'current').mockResolvedValue({
     id: '10000000-0000-0000-0000-000000000001',
     name: 'Lee',
     email: 'admin@example.com',
     role: 'admin',
+    product_tour_completed_at: '2026-08-05T12:00:00.000Z',
     created_at: '2026-07-13T11:00:00.000Z',
     updated_at: '2026-07-13T11:00:00.000Z'
   })
@@ -47,6 +52,7 @@ function renderDrawer(onSave = vi.fn().mockResolvedValue(undefined)) {
           onDelete={vi.fn().mockResolvedValue(undefined)}
           onToggle={vi.fn()}
           pending={false}
+          {...props}
         />
       </I18nextProvider>
     </QueryClientProvider>
@@ -124,5 +130,46 @@ describe('ProductDrawer', () => {
       notes: '',
       category: 'dairy_eggs'
     })
+  })
+
+  it('shows paid-specific copy when saving is rejected on a paid read-only boundary', async () => {
+    const user = userEvent.setup()
+    renderDrawer(vi.fn().mockRejectedValue(new ApiError('42501', 'household_read_only')), {
+      boundaryIsPaid: true
+    })
+
+    await user.clear(screen.getByRole('textbox', { name: /Notes/ }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your subscription has ended. The list is available to read during the seven-day grace period.'
+    )
+  })
+
+  it('uses attention copy when saving is rejected on a future-period paid boundary', async () => {
+    const user = userEvent.setup()
+    renderDrawer(vi.fn().mockRejectedValue(new ApiError('42501', 'household_read_only')), {
+      boundaryIsPaid: true,
+      paidBoundaryNeedsAttention: true
+    })
+
+    await user.clear(screen.getByRole('textbox', { name: /Notes/ }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your subscription requires attention. The list remains available to read, but changes are unavailable.'
+    )
+  })
+
+  it('keeps trial-specific copy when saving is rejected on a trial read-only boundary', async () => {
+    const user = userEvent.setup()
+    renderDrawer(vi.fn().mockRejectedValue(new ApiError('42501', 'household_read_only')))
+
+    await user.clear(screen.getByRole('textbox', { name: /Notes/ }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your trial has ended. The list is available to read during the seven-day grace period.'
+    )
   })
 })

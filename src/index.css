@@ -65,14 +65,20 @@ body {
   margin: 0;
   background: var(--background);
 }
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-button:not([data-slot='button']) {
-  color: inherit;
+/* Form-control reset must live in a layer so Tailwind utilities (e.g. text-sm,
+   font-medium on the shared Button) can override it. Unlayered rules would win. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  /* Same reasoning as the font reset: keep this in a layer so text-color
+     utilities (e.g. text-secondary-foreground on Dialog.Close buttons) win. */
+  button:not([data-slot='button']) {
+    color: inherit;
+  }
 }
 button:not(:disabled) {
   cursor: pointer;
@@ -105,38 +111,16 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='none' stroke='%232d5136' stroke-width='2'%3E%3Cpath d='M20 31c14-13 28-3 24 12-14 3-24-1-24-12Zm87 13c0-13 10-22 23-22 0 13-10 22-23 22ZM42 118h32l-4 25H47Z'/%3E%3Cpath d='M50 118c1-9 17-9 18 0M121 104c13-5 26 6 23 20-14 1-23-6-23-20ZM132 103v-13'/%3E%3Cpath d='M87 76h8v28h-8zM84 82h14'/%3E%3C/g%3E%3C/svg%3E");
 }
 
-.button {
-  min-height: 40px;
-  padding: 0.7rem 1rem;
-  border: 0;
-  border-radius: 0.75rem;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-weight: 700;
-  transition-property: background-color, scale;
-  transition-duration: 150ms;
-}
-.button:active {
-  scale: 0.96;
-}
-.button.secondary {
-  background: var(--secondary);
-  color: var(--secondary-foreground);
-}
-.button.danger {
-  background: var(--destructive);
-  color: white;
-}
 .icon-button {
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   place-items: center;
   border: 0;
   border-radius: 50%;
   background: transparent;
-  transition-property: background-color, scale;
+  transition-property: background-color, scale, opacity;
   transition-duration: 150ms;
 }
 .icon-button:hover {
@@ -144,6 +128,16 @@ body::before {
 }
 .icon-button:active {
   scale: 0.96;
+}
+.icon-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.icon-button:disabled:hover {
+  background: transparent;
+}
+.icon-button:disabled:active {
+  scale: 1;
 }
 .icon-button svg {
   width: 20px;
@@ -167,26 +161,44 @@ body::before {
   border-radius: 5px;
   background: var(--secondary);
 }
-.leaf-loader {
+/* Splash screen — a full-bleed deep-green arrival while auth is restoring. */
+.splash-screen {
+  position: relative;
+  display: grid;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  place-items: center;
+  color: rgb(246 241 231 / 0.95);
+  background:
+    radial-gradient(circle at 50% 44%, rgb(246 241 231 / 0.07), transparent 60%),
+    oklch(0.445 0.074 154);
+}
+.splash-ring {
+  position: absolute;
+  z-index: 0;
+  top: 17%;
+  left: 50%;
+  width: 178vw;
+  aspect-ratio: 2.5 / 1;
+  border: 1px solid rgb(246 241 231 / 0.14);
+  border-radius: 50%;
+  transform: translateX(-50%) rotate(-18deg);
+  box-shadow:
+    0 0 0 30px rgb(246 241 231 / 0.03),
+    0 0 0 60px rgb(246 241 231 / 0.02);
+}
+.splash-center {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
-  gap: 14px;
-  color: var(--primary);
-  font-size: 13px;
-  font-weight: 650;
 }
-.leaf-loader svg {
-  width: 54px;
-  height: 54px;
+.splash-mark {
+  width: clamp(130px, 34vw, 176px);
+  height: clamp(130px, 34vw, 176px);
   overflow: visible;
-  fill: currentColor;
-}
-.leaf-loader svg circle {
-  fill: var(--accent);
-}
-.leaf-loader.compact svg {
-  width: 26px;
-  height: 26px;
+  filter: drop-shadow(0 16px 26px rgb(16 39 25 / 0.42));
 }
 
 .login-page {
@@ -220,10 +232,16 @@ body::before {
   box-shadow: var(--shadow);
 }
 .login-card h1 {
-  margin: 2px 0 28px;
+  margin: 2px 0 12px;
   font-size: 36px;
   letter-spacing: -0.045em;
   text-wrap: balance;
+}
+.login-welcome {
+  margin: 0 0 24px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.5;
 }
 .login-card form,
 .drawer-form,
@@ -261,8 +279,121 @@ body::before {
 }
 .login-card form > button {
   width: 100%;
-  min-height: 48px;
   margin-top: 4px;
+}
+.login-create {
+  width: 100%;
+  margin-top: 12px;
+}
+.invite-page {
+  display: grid;
+  min-height: 100svh;
+  gap: 16px;
+  padding: 24px;
+  place-content: center;
+}
+.invite-card {
+  display: grid;
+  width: min(460px, calc(100vw - 32px));
+  gap: 14px;
+  padding: 28px;
+  border-radius: 24px;
+  background: color-mix(in oklab, var(--card), transparent 3%);
+  box-shadow: var(--shadow);
+}
+.invite-card .brand-mark {
+  margin-block: 0 8px;
+  transform: scale(0.72) rotate(45deg);
+  transform-origin: center;
+}
+.invite-card h1,
+.invite-card h2 {
+  margin: 0;
+  letter-spacing: -0.04em;
+}
+.invite-card h1 {
+  font-size: 31px;
+  text-wrap: balance;
+}
+.invite-card h2 {
+  font-size: 22px;
+}
+.invite-status-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--primary);
+}
+.invite-request-card {
+  background: color-mix(in oklab, var(--secondary), white 35%);
+}
+.invite-confirmation {
+  display: grid;
+  gap: 8px;
+}
+
+.onboarding-page {
+  display: grid;
+  min-height: 100svh;
+  padding: 24px;
+  place-content: center;
+}
+.onboarding-card {
+  display: grid;
+  width: min(460px, calc(100vw - 32px));
+  gap: 18px;
+  padding: 32px;
+  border-radius: 24px;
+  background: color-mix(in oklab, var(--card), transparent 3%);
+  box-shadow: var(--shadow);
+}
+.onboarding-card h1 {
+  margin: 0;
+  font-size: 32px;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.onboarding-eyebrow {
+  margin: 0;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.onboarding-copy,
+.onboarding-note {
+  margin: 0;
+  color: var(--muted-foreground);
+  line-height: 1.55;
+}
+.onboarding-points {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-inline-start: 20px;
+  line-height: 1.45;
+}
+.onboarding-form {
+  display: grid;
+  gap: 16px;
+}
+.onboarding-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.trial-summary {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--secondary);
+  line-height: 1.4;
+}
+.trial-summary span {
+  color: var(--secondary-foreground);
+  font-size: 14px;
 }
 .form-error {
   margin: 0;
@@ -270,6 +401,74 @@ body::before {
   font-size: 13px;
   font-weight: 650;
   line-height: 1.4;
+}
+.form-success {
+  margin: 0;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.account-form > p:first-child,
+.account-email-hint {
+  margin: 0;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+.product-tour-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.product-tour-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(23 31 25 / 0.58);
+}
+.product-tour-dialog {
+  position: relative;
+  display: grid;
+  width: min(420px, 100%);
+  gap: 12px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: 0 18px 60px rgb(22 34 25 / 0.22);
+}
+.product-tour-eyebrow {
+  margin: 0;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.product-tour-step {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 700;
+}
+.product-tour-dialog h2 {
+  margin: 4px 0 0;
+  font-size: clamp(24px, 7vw, 32px);
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+.product-tour-dialog > p:not(.product-tour-eyebrow):not(.product-tour-step):not(.form-error) {
+  margin: 0;
+  color: var(--muted-foreground);
+  line-height: 1.55;
+}
+.product-tour-next {
+  width: 100%;
+  margin-top: 12px;
 }
 
 .app-shell {
@@ -302,6 +501,25 @@ body::before {
   display: flex;
   align-items: center;
   gap: 2px;
+}
+.admin-menu-button {
+  position: relative;
+}
+.admin-pending-badge {
+  position: absolute;
+  inset-block-start: 1px;
+  inset-inline-end: 1px;
+  display: grid;
+  min-width: 16px;
+  height: 16px;
+  padding-inline: 3px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1;
 }
 .language-button {
   display: flex;
@@ -343,6 +561,17 @@ body::before {
 .mini-leaf::after {
   inset: auto 0 0 auto;
   background: var(--accent);
+}
+
+.entitlement-banner {
+  margin: 0 18px 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--background));
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .list-surface {
@@ -476,7 +705,7 @@ body::before {
   scale: 0.96;
 }
 .search-actions > button[aria-disabled='true'] {
-  opacity: 0.28;
+  opacity: 0.5;
 }
 .search-actions > button svg {
   width: 21px;
@@ -553,6 +782,13 @@ body::before {
 .list-control-button:active {
   scale: 0.94;
 }
+/* Compact list controls keep their visual size but expand their hit area to a
+   44px interactive box via a transparent ::before layer. */
+.list-control-button::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
 .list-control-button.is-active {
   background: var(--secondary);
   color: var(--primary);
@@ -580,7 +816,7 @@ body::before {
   height: 12px;
 }
 .product-section h2 .restore-all-button:disabled {
-  opacity: 0.3;
+  opacity: 0.5;
 }
 .category-group + .category-group {
   margin-top: 16px;
@@ -735,7 +971,7 @@ body::before {
   scale: 0.96;
 }
 .quantity-controls button:disabled {
-  opacity: 0.24;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 .quantity-controls svg {
@@ -951,6 +1187,10 @@ body::before {
   padding: 16px 20px 20px;
   touch-action: pan-y;
 }
+.admin-drawer .drawer-content {
+  display: grid;
+  gap: 12px;
+}
 .product-drawer .drawer-content {
   display: flex;
   flex-direction: column;
@@ -1113,6 +1353,7 @@ body::before {
 .clear-notes-button:not(:disabled):active {
   scale: 0.96;
 }
+/* Deliberate: the eraser is hidden entirely while there is nothing to clear. */
 .clear-notes-button:disabled {
   opacity: 0;
   pointer-events: none;
@@ -1128,10 +1369,6 @@ body::before {
 }
 .drawer-save {
   width: 100%;
-  min-height: 48px;
-}
-.drawer-form > button:nth-last-child(2) {
-  min-height: 44px;
 }
 .confirm-viewport {
   position: fixed;
@@ -1147,6 +1384,18 @@ body::before {
   border-radius: 20px;
   background: var(--card);
   box-shadow: var(--shadow);
+}
+.delete-household-dialog {
+  display: grid;
+  gap: 16px;
+}
+.delete-household-dialog h2,
+.delete-household-dialog p {
+  margin: 0;
+}
+.delete-household-dialog .delete-household-options,
+.delete-household-dialog .delete-household-confirmation {
+  margin: 0;
 }
 .confirm-popup h2 {
   margin: 0 0 8px;
@@ -1170,6 +1419,50 @@ body::before {
   display: grid;
   gap: 4px;
   margin-top: 20px;
+}
+.delete-household-options {
+  padding: 0;
+  border: 0;
+}
+.delete-household-options label {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.delete-household-options input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--destructive);
+}
+.delete-household-confirmation {
+  display: grid;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.delete-household-confirmation input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--input);
+  border-radius: 12px;
+  background: white;
+  color: var(--foreground);
+}
+.delete-household-confirmation input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.65;
+}
+.delete-household-confirmation input:focus {
+  border-color: var(--primary);
+  outline: 3px solid color-mix(in oklab, var(--ring), transparent 55%);
+  outline-offset: 0;
+}
+.delete-household-dialog .confirm-actions {
+  margin-top: 0;
 }
 .switch-option {
   display: flex;
@@ -1211,6 +1504,99 @@ body::before {
 }
 [dir='rtl'] .switch-option [role='switch'][data-checked] span {
   transform: translateX(-18px);
+}
+.invite-management,
+.pending-requests,
+.plan-management,
+.reset-management {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--muted);
+}
+.invite-management p,
+.reset-management p,
+.admin-empty {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.plan-summary {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+.plan-notice {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.invite-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+.invite-link-row input {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--input);
+  border-radius: 10px;
+  background: white;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.pending-count {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 11px;
+}
+.pending-request-list {
+  display: grid;
+  gap: 8px;
+}
+.pending-request-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-block: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.pending-request-list article > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.pending-request-list strong,
+.pending-request-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pending-request-list strong {
+  font-size: 13px;
+}
+.pending-request-list small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.pending-request-actions {
+  display: flex;
+  gap: 2px;
 }
 .admin-create {
   padding: 16px;
