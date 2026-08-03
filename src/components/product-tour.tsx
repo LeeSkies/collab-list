@@ -9,7 +9,7 @@ type TourStep = {
   body: string
 }
 
-export function ProductTour({ role, onComplete }: { role: Role; onComplete(): Promise<unknown> }) {
+export function ProductTour({ role, onComplete }: { role: Role; onComplete(): Promise<void> }) {
   const { t } = useTranslation()
   const isAdmin = role === 'admin'
   const [stepIndex, setStepIndex] = useState(0)

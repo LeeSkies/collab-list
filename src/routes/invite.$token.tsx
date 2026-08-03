@@ -10,8 +10,7 @@ export const Route = createFileRoute('/invite/$token')({ component: InviteEntry 
 function InviteEntry() {
   const auth = useAuth()
   const { token } = Route.useParams()
-  if (auth.restoring)
-    return <SplashScreen />
+  if (auth.restoring) return <SplashScreen />
   if (auth.session && auth.profile?.household_id) return <GroceryApp />
   if (auth.session && auth.profile) return <InviteHousehold token={token} />
   return (
