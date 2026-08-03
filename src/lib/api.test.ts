@@ -325,6 +325,36 @@ describe('household.requestBillingAction', () => {
   })
 })
 
+describe('request lifecycle normalization', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('throws a normalized empty response when an RPC returns no data', async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+
+    await expect(api.products.restoreAll(false, false)).rejects.toMatchObject({
+      code: 'empty'
+    })
+  })
+
+  it('normalizes a transport error to a typed ApiError with the reported code', async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'not authorized' } })
+
+    await expect(api.products.restoreAll(false, false)).rejects.toMatchObject({
+      code: '42501',
+      message: 'not authorized'
+    })
+    await expect(api.products.restoreAll(false, false)).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it('falls back to a normalized unknown code when the DB error carries no code', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
+
+    await expect(api.products.restoreAll(false, false)).rejects.toMatchObject({
+      code: 'unknown'
+    })
+  })
+})
+
 describe('products.list', () => {
   it('forwards React Query cancellation to the Supabase request', async () => {
     const abortSignal = vi.fn(
