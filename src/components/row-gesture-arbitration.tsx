@@ -3,10 +3,11 @@ import {
   useMotionValue,
   useReducedMotion,
   useTransform,
+  type HTMLMotionProps,
   type MotionValue
 } from 'motion/react'
 import { useState } from 'react'
-import type { MouseEvent, PointerEvent } from 'react'
+import type { MouseEvent, PointerEvent, ReactNode } from 'react'
 import { swipeDecision, useHoldGesture } from '../lib/hold-gesture'
 import { HoldRevealPortal } from './hold-to-reveal-name'
 
@@ -20,13 +21,21 @@ export interface RowGestureArbitrationOptions {
   onToggle(): void
 }
 
+/**
+ * Props for the row's swipe/hold surface, spread onto a motion.article.
+ * Includes the explicit data attribute the CSS threshold selector matches on.
+ */
+export type RowArticleProps = HTMLMotionProps<'article'> & {
+  'data-threshold'?: boolean | undefined
+}
+
 export interface RowGestureArbitrationResult {
   /**
    * Props for the row's swipe/hold surface. Spreading these onto the
    * interactive article installs hold, swipe, tap suppression, context-menu
    * suppression, and pointer-cancellation handling at one explicit seam.
    */
-  articleProps: Record<string, unknown>
+  articleProps: RowArticleProps
   /** Style for the action icon revealed underneath the row while swiping. */
   revealStyle: { opacity: MotionValue<number> }
   /**
@@ -39,7 +48,7 @@ export interface RowGestureArbitrationResult {
     onContextMenu(event: MouseEvent<HTMLElement>): void
   }
   /** Portal with the held-name tooltip. */
-  reveal: ReturnType<typeof HoldRevealPortal>
+  reveal: ReactNode
 }
 
 /**
@@ -82,16 +91,15 @@ export function useRowGestureArbitration(
     ]).then(onToggle)
   }
 
-  const articleProps = {
+  const articleProps: RowArticleProps = {
     ...holdTargetProps,
     style: { x, opacity },
     drag: reducedMotion || busy || !canMutate ? false : 'x',
     dragConstraints: { left: direction < 0 ? -104 : 0, right: direction > 0 ? 104 : 0 },
     dragElastic: 0.08,
     dragMomentum: false,
-    onDrag: (_event: unknown, info: { offset: { x: number } }) =>
-      setCrossed(swipeDecision(info.offset.x, direction) === 'toggle'),
-    onDragEnd: (_event: unknown, info: { offset: { x: number } }) => {
+    onDrag: (_event, info) => setCrossed(swipeDecision(info.offset.x, direction) === 'toggle'),
+    onDragEnd: (_event, info) => {
       if (!canMutate) {
         settleBack()
         return

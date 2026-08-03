@@ -33,8 +33,7 @@ function Home() {
         </p>
       </main>
     )
-  if (auth.restoring)
-    return <SplashScreen />
+  if (auth.restoring) return <SplashScreen />
   if (auth.session) {
     if (deletedHousehold.data) return <DeletedHouseholdScreen household={deletedHousehold.data} />
     if (auth.profile?.household_id && !onboardingOpen) return <GroceryApp />
