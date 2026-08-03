@@ -71,7 +71,7 @@ select,
 textarea {
   font: inherit;
 }
-button:not([data-slot='button']) {
+button:not([data-slot='button']):not(.button) {
   color: inherit;
 }
 button:not(:disabled) {
@@ -1175,6 +1175,10 @@ body::before {
   padding: 16px 20px 20px;
   touch-action: pan-y;
 }
+.admin-drawer .drawer-content {
+  display: grid;
+  gap: 12px;
+}
 .product-drawer .drawer-content {
   display: flex;
   flex-direction: column;
@@ -1372,6 +1376,18 @@ body::before {
   background: var(--card);
   box-shadow: var(--shadow);
 }
+.delete-household-dialog {
+  display: grid;
+  gap: 16px;
+}
+.delete-household-dialog h2,
+.delete-household-dialog p {
+  margin: 0;
+}
+.delete-household-dialog .delete-household-options,
+.delete-household-dialog .delete-household-confirmation {
+  margin: 0;
+}
 .confirm-popup h2 {
   margin: 0 0 8px;
   font-size: 19px;
@@ -1394,6 +1410,50 @@ body::before {
   display: grid;
   gap: 4px;
   margin-top: 20px;
+}
+.delete-household-options {
+  padding: 0;
+  border: 0;
+}
+.delete-household-options label {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.delete-household-options input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--destructive);
+}
+.delete-household-confirmation {
+  display: grid;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.delete-household-confirmation input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--input);
+  border-radius: 12px;
+  background: white;
+  color: var(--foreground);
+}
+.delete-household-confirmation input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.65;
+}
+.delete-household-confirmation input:focus {
+  border-color: var(--primary);
+  outline: 3px solid color-mix(in oklab, var(--ring), transparent 55%);
+  outline-offset: 0;
+}
+.delete-household-dialog .confirm-actions {
+  margin-top: 0;
 }
 .switch-option {
   display: flex;

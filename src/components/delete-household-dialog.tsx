@@ -23,13 +23,12 @@ export function DeleteHouseholdDialog({
       <Dialog.Portal>
         <Dialog.Backdrop className="dialog-backdrop" />
         <Dialog.Viewport className="confirm-viewport">
-          <Dialog.Popup className="confirm-popup">
+          <Dialog.Popup className="confirm-popup delete-household-dialog">
             <Dialog.Title>{t('deleteHouseholdTitle')}</Dialog.Title>
             <Dialog.Description>
               {purgeNow ? t('deleteHouseholdPurgeBody') : t('deleteHouseholdBody')}
             </Dialog.Description>
-            <fieldset className="choice-dialog-options">
-              <legend>{t('deleteHouseholdMode')}</legend>
+            <fieldset className="choice-dialog-options delete-household-options">
               <label>
                 <input
                   type="radio"
@@ -49,12 +48,15 @@ export function DeleteHouseholdDialog({
                 {t('deleteHouseholdPermanent')}
               </label>
             </fieldset>
-            <label>
-              {t('deleteHouseholdConfirmationLabel')}
+            <label className="delete-household-confirmation">
+              <span>{t('deleteHouseholdConfirmationLabel')}</span>
               <input
                 value={confirmation}
                 onChange={(event) => setConfirmation(event.target.value)}
+                placeholder={t('deleteHouseholdConfirmationWord')}
                 autoComplete="off"
+                spellCheck={false}
+                autoCapitalize="characters"
               />
             </label>
             <div className="confirm-actions">
@@ -64,6 +66,7 @@ export function DeleteHouseholdDialog({
               <Button
                 type="button"
                 variant="destructive"
+                size="lg"
                 disabled={!canConfirm || pending}
                 onClick={() => onConfirm(purgeNow)}
               >

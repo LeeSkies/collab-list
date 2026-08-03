@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(60);
+select plan(63);
 set local role postgres;
 
 select has_table('public', 'deleted_households', 'deleted household recovery metadata exists');
@@ -276,6 +276,11 @@ select is(
   'immediate purge clears the owned household FK while retaining the eligibility row'
 );
 select is(
+  (select owned_trial_started_at is not null from public.account_trial_eligibility where user_id = '10000000-0000-0000-0000-000000000001'),
+  true,
+  'immediate purge retains the original trial start for replacement eligibility'
+);
+select is(
   (select provider || ':' || provider_subscription_id
    from public.household_cancellation_outbox
    where provider_subscription_id = 'delete-test-sub'
@@ -356,6 +361,22 @@ select is(
    where provider_subscription_id = 'expiry-test-sub'),
   'pending',
   'expiry purge leaves a durable pending cancellation intent'
+);
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select lives_ok(
+  $$ select * from public.create_household_with_trial() $$,
+  'a former admin can create a replacement household during the active trial'
+);
+select is(
+  (select household_trials.starts_at
+   from public.household_trials
+   join public.household_members on household_members.household_id = household_trials.household_id
+   where household_members.user_id = '10000000-0000-0000-0000-000000000001'::uuid),
+  (select owned_trial_started_at
+   from public.account_trial_eligibility
+   where user_id = '10000000-0000-0000-0000-000000000001'::uuid),
+  'replacement household reuses the original trial start'
 );
 select * from finish();
 rollback;

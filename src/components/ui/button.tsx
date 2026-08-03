@@ -16,7 +16,7 @@ const buttonVariants = cva(
         ghost:
           'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50',
         destructive:
-          'bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40',
+          'bg-destructive text-white hover:bg-destructive/85 focus-visible:border-destructive focus-visible:ring-destructive/30 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 dark:bg-destructive dark:hover:bg-destructive/85 dark:focus-visible:ring-destructive/50 dark:disabled:bg-muted dark:disabled:text-muted-foreground',
         link: 'text-primary underline-offset-4 hover:underline'
       },
       size: {
@@ -55,4 +55,4 @@ function Button({
   )
 }
 
-export { Button, buttonVariants }
+export { Button }
