@@ -498,6 +498,53 @@ describe('GroceryApp quantity reconciliation', () => {
   })
 })
 
+describe('GroceryApp CRUD reconciliation', () => {
+  it('does not let a stale drawer save reverse a newer authoritative revision', async () => {
+    const user = userEvent.setup()
+    const authoritative = { ...newProduct, quantity: '3.00', version: 3 }
+    vi.spyOn(api.products, 'list')
+      .mockResolvedValueOnce([newProduct])
+      .mockResolvedValue([authoritative])
+    let resolveUpdate!: (product: Product) => void
+    const staleUpdate = new Promise<Product>((resolve) => {
+      resolveUpdate = resolve
+    })
+    const update = vi.spyOn(api.products, 'update').mockReturnValue(staleUpdate)
+    let onProductChange: () => void = () => undefined
+    vi.spyOn(api.realtime, 'subscribe').mockImplementation((onChange) => {
+      onProductChange = onChange
+      return { unsubscribe: vi.fn() } as never
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Bread' }))
+    const category = await screen.findByRole('combobox', { name: 'Category' })
+    await user.selectOptions(category, 'snacks')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(update).toHaveBeenCalled()
+
+    // A peer's authoritative change lands while the drawer save is in flight.
+    onProductChange()
+    await waitFor(() => {
+      expect(client.getQueryData(['products', newProduct.household_id])).toEqual([authoritative])
+    })
+
+    // The slow drawer save resolves with a stale revision afterwards.
+    resolveUpdate({ ...newProduct, quantity: '2.00', version: 2 })
+    await waitFor(() => {
+      expect(client.getQueryData(['products', newProduct.household_id])).toEqual([authoritative])
+    })
+  })
+})
+
 describe('GroceryApp product tour', () => {
   it('shows a new member tour after household entry and does not reopen after completion', async () => {
     const user = userEvent.setup()

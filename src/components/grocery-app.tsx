@@ -466,8 +466,11 @@ export function GroceryApp() {
     mutationFn: ({ product, changes }: { product: Product; changes: ProductChanges }) =>
       api.products.update(product, changes),
     onSuccess: (next) => {
-      replaceProduct(next)
-      if (householdId && next.household_id === householdId) setSelected(next)
+      applyAuthoritative(next)
+      const applied =
+        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === next.id) ??
+        next
+      if (householdId && applied.household_id === householdId) setSelected(applied)
     },
     onError: (reason, variables) => mutationError(reason, variables.product.id)
   })
