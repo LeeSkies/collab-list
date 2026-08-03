@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyAuthoritativeProduct,
   ProductMutationCoordinator,
   rollbackOptimisticProduct
 } from './product-mutation-coordinator'
@@ -71,5 +72,39 @@ describe('rollbackOptimisticProduct', () => {
 
     // The optimistic row is gone; a stale failure must not insert it back.
     expect(rollbackOptimisticProduct([unrelated], optimistic, previous)).toEqual([unrelated])
+  })
+})
+
+describe('applyAuthoritativeProduct', () => {
+  it('replaces the row by id when an authoritative result is the current revision', () => {
+    const current = { id: 'a', version: 2, name: 'before' }
+    const authoritative = { id: 'a', version: 3, name: 'picked' }
+
+    expect(applyAuthoritativeProduct([current], authoritative)).toEqual([authoritative])
+  })
+
+  it('is idempotent for a realtime echo that already carries the same version', () => {
+    const authoritative = { id: 'a', version: 3, name: 'picked' }
+
+    // A duplicate echo of the same toggle must not double-apply or regress state.
+    expect(applyAuthoritativeProduct([authoritative], authoritative)).toEqual([authoritative])
+  })
+
+  it('never lets a stale success regress a newer authoritative revision', () => {
+    const stale = { id: 'a', version: 2, name: 'stale-undo' }
+    const newer = { id: 'a', version: 3, name: 'picked' }
+
+    expect(applyAuthoritativeProduct([newer], stale)).toEqual([newer])
+  })
+
+  it('preserves unrelated rows while applying the authoritative row by identity', () => {
+    const currentA = { id: 'a', version: 2 }
+    const keepB = { id: 'b', version: 5 }
+    const authoritative = { id: 'a', version: 3 }
+
+    expect(applyAuthoritativeProduct([currentA, keepB], authoritative)).toEqual([
+      authoritative,
+      keepB
+    ])
   })
 })

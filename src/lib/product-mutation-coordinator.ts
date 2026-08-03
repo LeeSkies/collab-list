@@ -46,3 +46,16 @@ export function rollbackOptimisticProduct<T extends RevisionedProduct>(
     product.id === optimistic.id && product.version === optimistic.version ? previous : product
   )
 }
+
+export function applyAuthoritativeProduct<T extends RevisionedProduct>(
+  products: readonly T[],
+  authoritative: T
+): T[] {
+  return products.map((product) =>
+    product.id === authoritative.id
+      ? product.version > authoritative.version
+        ? product
+        : authoritative
+      : product
+  )
+}

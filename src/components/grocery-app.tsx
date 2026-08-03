@@ -29,6 +29,7 @@ import {
   type ProductSortMode
 } from '../lib/product'
 import {
+  applyAuthoritativeProduct,
   ProductMutationCoordinator,
   rollbackOptimisticProduct,
   type ProductMutationState
@@ -375,6 +376,12 @@ export function GroceryApp() {
       current.map((product) => (product.id === next.id ? next : product))
     )
   }
+  function applyAuthoritative(next: Product) {
+    if (!householdId || next.household_id !== householdId) return
+    client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
+      applyAuthoritativeProduct(current, next)
+    )
+  }
   function rollbackProduct(optimistic: Product, previous: Product) {
     if (!householdId || optimistic.household_id !== householdId) return
     client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
@@ -436,9 +443,12 @@ export function GroceryApp() {
       return { previous, optimistic }
     },
     onSuccess: (next) => {
-      replaceProduct(next)
-      if (householdId && selected?.id === next.id && selected.household_id === householdId)
-        setSelected(next)
+      applyAuthoritative(next)
+      const applied =
+        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === next.id) ??
+        next
+      if (householdId && selected?.id === applied.id && selected.household_id === householdId)
+        setSelected(applied)
     },
     onError: async (reason, variables, context) => {
       if (context) rollbackProduct(context.optimistic, context.previous)
