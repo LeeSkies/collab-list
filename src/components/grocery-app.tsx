@@ -15,28 +15,16 @@ import {
 } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth } from '../auth'
-import { api, ApiError, isProductConflict } from '../lib/api'
+import { api } from '../lib/api'
 import { supabase } from '../lib/supabase'
-import {
-  duplicateSignature,
-  normalizeNameForStorage,
-  normalizeText,
-  orderProductSections,
-  type ProductSortMode
-} from '../lib/product'
-import {
-  applyAuthoritativeProduct,
-  ProductMutationCoordinator,
-  rollbackOptimisticProduct,
-  type ProductMutationState
-} from '../lib/product-mutation-coordinator'
-import { PRODUCT_CATEGORIES, type ProductCategory } from '../lib/product-category'
-import type { Product, ProductChanges } from '../lib/types'
-import { TrailingRefresh } from '../lib/trailing-refresh'
+import { normalizeText, type ProductSortMode } from '../lib/product'
+import type { ProductCategory } from '../lib/product-category'
+import type { Product } from '../lib/types'
+import { useGroceryList } from '../hooks/use-grocery-list'
 import { AccountDrawer } from './account-drawer'
 import { AdminDrawer } from './admin-drawer'
 import { CategoryFilterDrawer } from './category-filter-drawer'
@@ -66,29 +54,14 @@ export function GroceryApp() {
   const [duplicatePulse, setDuplicatePulse] = useState('')
   const [enteringProductIds, setEnteringProductIds] = useState<ReadonlySet<string>>(new Set())
   const [toast, setToast] = useState('')
-  const [online, setOnline] = useState(navigator.onLine)
-  const [realtime, setRealtime] = useState('connecting')
-  const [showConnectionWarning, setShowConnectionWarning] = useState(false)
   const [productTourClosed, setProductTourClosed] = useState(false)
-  const mutationCoordinator = useRef(new ProductMutationCoordinator())
   const previousPendingCount = useRef<number | undefined>(undefined)
-  const [mutationState, setMutationState] = useState<ProductMutationState>({
-    productIds: new Set(),
-    bulk: false
-  })
+  const previousHouseholdId = useRef<string | undefined>(undefined)
   const [renderedAt] = useState(() => Date.now())
   const searchRef = useRef<HTMLInputElement>(null)
   const householdId = auth.profile?.household_id
-  const previousHouseholdId = useRef<string | undefined>(householdId)
-  const productsQueryKey = useMemo(() => ['products', householdId] as const, [householdId])
-  const products = useQuery({
-    queryKey: productsQueryKey,
-    queryFn: ({ signal }) => api.products.list(signal),
-    enabled: Boolean(householdId),
-    retry: 1,
-    staleTime: 0,
-    gcTime: 0
-  })
+  const locale = i18n.resolvedLanguage ?? i18n.language
+
   const entitlement = useQuery({
     queryKey: ['household-entitlement', householdId],
     queryFn: api.household.entitlement,
@@ -135,16 +108,46 @@ export function GroceryApp() {
     mutationFn: api.profile.completeProductTour,
     onSuccess: () => setProductTourClosed(true)
   })
-  const connectionWarningEligible =
-    !products.isLoading && !products.isError && (!online || realtime === 'disconnected')
+
+  const refreshBoundaryQueries = useCallback(() => {
+    if (!householdId) return
+    void client.refetchQueries({ queryKey: ['household-entitlement', householdId], type: 'active' })
+    void client.refetchQueries({
+      queryKey: ['household-subscription', householdId],
+      type: 'active'
+    })
+  }, [client, householdId])
+
+  const grocery = useGroceryList({
+    householdId,
+    canMutate,
+    boundaryIsPaid,
+    paidBoundaryNeedsAttention,
+    search,
+    sortMode,
+    categoryFilters,
+    locale,
+    t,
+    selectedId: selected?.id ?? null,
+    onSelectedChange: setSelected,
+    onEntranceAdded: (productId) =>
+      setEnteringProductIds((current) => new Set(current).add(productId)),
+    onDuplicatePulse: (productId) => {
+      setDuplicatePulse(productId)
+      window.setTimeout(() => setDuplicatePulse(''), 520)
+    },
+    onCreated: () => {
+      setSearch('')
+      searchRef.current?.focus()
+    },
+    onRestoreAllClosed: () => setRestoreAllOpen(false),
+    onRefreshEntitlement: refreshBoundaryQueries,
+    onToast: setToast
+  })
 
   useEffect(() => {
     const previous = previousHouseholdId.current
-    if (!householdId) client.removeQueries({ queryKey: ['products'] })
     if (previous !== householdId) {
-      if (previous) {
-        client.removeQueries({ queryKey: ['products', previous], exact: true })
-      }
       setSelected(null)
       setAdminOpen(false)
       setAccountOpen(false)
@@ -153,28 +156,7 @@ export function GroceryApp() {
       setCategoryFilters(new Set())
       previousHouseholdId.current = householdId
     }
-  }, [client, householdId])
-
-  useEffect(() => {
-    const online = () => {
-      setOnline(true)
-      setToast(t('connected'))
-      if (householdId) {
-        void client.refetchQueries({ queryKey: productsQueryKey, type: 'active' })
-        void client.refetchQueries({
-          queryKey: ['household-entitlement', householdId],
-          type: 'active'
-        })
-      }
-    }
-    const offline = () => setOnline(false)
-    addEventListener('online', online)
-    addEventListener('offline', offline)
-    return () => {
-      removeEventListener('online', online)
-      removeEventListener('offline', offline)
-    }
-  }, [client, householdId, productsQueryKey, t])
+  }, [householdId])
 
   useEffect(() => {
     if (!toast) return
@@ -211,157 +193,6 @@ export function GroceryApp() {
     }
   }, [auth.profile?.role, client, householdId])
 
-  useEffect(() => {
-    if (!householdId) return
-    const refresher = new TrailingRefresh(
-      () =>
-        client.refetchQueries(
-          { queryKey: productsQueryKey, type: 'active' },
-          { throwOnError: true }
-        ),
-      100
-    )
-    const channel = api.realtime.subscribe(
-      () => refresher.schedule(),
-      (status) => {
-        setRealtime(
-          status === 'SUBSCRIBED'
-            ? 'connected'
-            : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'
-              ? 'disconnected'
-              : 'connecting'
-        )
-        if (status === 'SUBSCRIBED') refresher.runNow()
-      },
-      householdId
-    )
-    return () => {
-      refresher.dispose()
-      void channel.unsubscribe()
-    }
-  }, [client, householdId, productsQueryKey])
-
-  useEffect(() => {
-    const timeout = window.setTimeout(
-      () => setShowConnectionWarning(connectionWarningEligible),
-      connectionWarningEligible ? 1800 : 0
-    )
-    return () => window.clearTimeout(timeout)
-  }, [connectionWarningEligible])
-
-  const list = useMemo(() => products.data ?? [], [products.data])
-  const selectedProduct =
-    selected && selected.household_id === householdId
-      ? (list.find((product) => product.id === selected.id) ?? selected)
-      : null
-  const categoryFilterActive =
-    categoryFilters.size > 0 && categoryFilters.size < PRODUCT_CATEGORIES.length
-  const filteredList = useMemo(
-    () =>
-      categoryFilterActive ? list.filter((product) => categoryFilters.has(product.category)) : list,
-    [categoryFilterActive, categoryFilters, list]
-  )
-  const { unpicked, picked } = useMemo(
-    () =>
-      orderProductSections(filteredList, search, sortMode, i18n.resolvedLanguage ?? i18n.language),
-    [filteredList, i18n.language, i18n.resolvedLanguage, search, sortMode]
-  )
-  const signature = duplicateSignature(search)
-  const duplicate = signature
-    ? list.find((product) => product.name_signature === signature)
-    : undefined
-  const canCreate = canMutate && Boolean(householdId && normalizeText(search)) && !duplicate
-
-  async function refreshProducts(productId?: string) {
-    try {
-      await client.refetchQueries(
-        { queryKey: productsQueryKey, type: 'active' },
-        { throwOnError: true }
-      )
-    } catch {
-      if (productId) {
-        setSelected((current) => (current?.id === productId ? null : current))
-      }
-      return false
-    }
-    if (!productId) return
-    const latest = client
-      .getQueryData<Product[]>(productsQueryKey)
-      ?.find((product) => product.id === productId)
-    setSelected((current) => (current?.id === productId ? (latest ?? null) : current))
-    return true
-  }
-  async function mutationError(reason: unknown, productId?: string) {
-    const entitlementBoundaryError =
-      reason instanceof ApiError &&
-      (reason.message.includes('household_read_only') ||
-        reason.message.includes('household_entitlement_locked'))
-    const paidBoundary = boundaryIsPaid
-    const paidAttention = paidBoundaryNeedsAttention
-    if (entitlementBoundaryError && householdId) {
-      void client
-        .fetchQuery({
-          queryKey: ['household-entitlement', householdId],
-          queryFn: api.household.entitlement,
-          staleTime: 0
-        })
-        .catch(() => undefined)
-      void client
-        .fetchQuery({
-          queryKey: ['household-subscription', householdId],
-          queryFn: api.household.subscription,
-          staleTime: 0
-        })
-        .catch(() => undefined)
-    }
-    setToast(
-      isProductConflict(reason)
-        ? t('conflict')
-        : reason instanceof ApiError
-          ? reason.code === '23505'
-            ? t('duplicate')
-            : reason.message.includes('household_read_only')
-              ? paidBoundary
-                ? paidAttention
-                  ? t('householdPaidAttention')
-                  : t('householdReadOnlyPaid')
-                : t('householdReadOnly')
-              : reason.message.includes('household_entitlement_locked')
-                ? paidBoundary
-                  ? t('householdLockedPaid')
-                  : t('householdLocked')
-                : reason.code === 'timeout'
-                  ? t('timeout')
-                  : t('requestFailed')
-          : navigator.onLine
-            ? t('requestFailed')
-            : t('offline')
-    )
-    if (isProductConflict(reason) || (reason instanceof ApiError && reason.code === 'timeout')) {
-      await refreshProducts(productId)
-    }
-  }
-  function syncMutationState() {
-    setMutationState(mutationCoordinator.current.snapshot())
-  }
-  function lockProduct(productId: string) {
-    const locked = mutationCoordinator.current.lockProduct(productId)
-    if (locked) syncMutationState()
-    return locked
-  }
-  function unlockProduct(productId: string) {
-    mutationCoordinator.current.unlockProduct(productId)
-    syncMutationState()
-  }
-  function lockBulk() {
-    const locked = mutationCoordinator.current.lockBulk()
-    if (locked) syncMutationState()
-    return locked
-  }
-  function unlockBulk() {
-    mutationCoordinator.current.unlockBulk()
-    syncMutationState()
-  }
   function completeEntrance(productId: string) {
     setEnteringProductIds((current) => {
       if (!current.has(productId)) return current
@@ -370,213 +201,30 @@ export function GroceryApp() {
       return next
     })
   }
-  function replaceProduct(next: Product) {
-    if (!householdId || next.household_id !== householdId) return
-    client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
-      current.map((product) => (product.id === next.id ? next : product))
-    )
-  }
-  function applyAuthoritative(next: Product) {
-    if (!householdId || next.household_id !== householdId) return
-    client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
-      applyAuthoritativeProduct(current, next)
-    )
-  }
-  function rollbackProduct(optimistic: Product, previous: Product) {
-    if (!householdId || optimistic.household_id !== householdId) return
-    client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
-      rollbackOptimisticProduct(current, optimistic, previous)
-    )
-  }
-  const create = useMutation({
-    mutationFn: api.products.create,
-    onSuccess: (product) => {
-      if (!householdId || product.household_id !== householdId) return
-      setEnteringProductIds((current) => new Set(current).add(product.id))
-      client.setQueryData<Product[]>(productsQueryKey, (current = []) => [
-        product,
-        ...current.filter((item) => item.id !== product.id)
-      ])
-      setSearch('')
-      searchRef.current?.focus()
-    },
-    onError: (reason) => mutationError(reason)
-  })
-  const adjust = useMutation({
-    mutationFn: ({ product, delta }: { product: Product; delta: 1 | -1 }) =>
-      api.products.adjust(product.id, delta, product.version),
-    onMutate: async ({ product, delta }) => {
-      await client.cancelQueries({ queryKey: productsQueryKey })
-      const previous =
-        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === product.id) ??
-        product
-      const optimistic = {
-        ...previous,
-        quantity: String(Number(previous.quantity) + delta),
-        version: previous.version + 1
-      }
-      replaceProduct(optimistic)
-      return { previous, optimistic }
-    },
-    onSuccess: (next) => {
-      applyAuthoritative(next)
-      const applied =
-        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === next.id) ??
-        next
-      if (householdId && selected?.id === applied.id && selected.household_id === householdId)
-        setSelected(applied)
-    },
-    onError: async (reason, variables, context) => {
-      if (context) rollbackProduct(context.optimistic, context.previous)
-      await mutationError(reason, variables.product.id)
-    }
-  })
-  const toggle = useMutation({
-    mutationFn: api.products.toggle,
-    onMutate: async (product) => {
-      await client.cancelQueries({ queryKey: productsQueryKey })
-      const previous =
-        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === product.id) ??
-        product
-      const now = new Date().toISOString()
-      const optimistic = {
-        ...previous,
-        is_picked: !previous.is_picked,
-        picked_at: previous.is_picked ? null : now,
-        ordering_at: now,
-        version: previous.version + 1
-      }
-      replaceProduct(optimistic)
-      return { previous, optimistic }
-    },
-    onSuccess: (next) => {
-      applyAuthoritative(next)
-      const applied =
-        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === next.id) ??
-        next
-      if (householdId && selected?.id === applied.id && selected.household_id === householdId)
-        setSelected(applied)
-    },
-    onError: async (reason, variables, context) => {
-      if (context) rollbackProduct(context.optimistic, context.previous)
-      await mutationError(reason, variables.id)
-    }
-  })
-  const update = useMutation({
-    mutationFn: ({ product, changes }: { product: Product; changes: ProductChanges }) =>
-      api.products.update(product, changes),
-    onSuccess: (next) => {
-      applyAuthoritative(next)
-      const applied =
-        client.getQueryData<Product[]>(productsQueryKey)?.find((item) => item.id === next.id) ??
-        next
-      if (householdId && applied.household_id === householdId) setSelected(applied)
-    },
-    onError: (reason, variables) => mutationError(reason, variables.product.id)
-  })
-  const remove = useMutation({
-    mutationFn: api.products.remove,
-    onSuccess: (_, product) => {
-      if (!householdId || product.household_id !== householdId) return
-      client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
-        current.filter((item) => item.id !== product.id)
-      )
-    },
-    onError: (reason, product) => mutationError(reason, product.id)
-  })
-  const restoreAll = useMutation({
-    mutationFn: ({
-      clearNotes,
-      resetQuantities
-    }: {
-      clearNotes: boolean
-      resetQuantities: boolean
-    }) => api.products.restoreAll(clearNotes, resetQuantities),
-    onSuccess: (restored) => {
-      if (!householdId) return
-      const restoredById = new Map(
-        restored
-          .filter((product) => product.household_id === householdId)
-          .map((product) => [product.id, product])
-      )
-      client.setQueryData<Product[]>(productsQueryKey, (current = []) =>
-        current.map((product) => restoredById.get(product.id) ?? product)
-      )
-      setRestoreAllOpen(false)
-    },
-    onError: (reason) => mutationError(reason)
-  })
 
-  function activateCreate() {
-    if (!canMutate) return
-    if (duplicate) {
-      setDuplicatePulse(duplicate.id)
-      setToast(t('duplicate'))
-      setTimeout(() => setDuplicatePulse(''), 520)
-      document
-        .querySelector(`[data-product-id="${duplicate.id}"]`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      return
-    }
-    if (canCreate && !create.isPending) create.mutate(normalizeNameForStorage(search))
-  }
-
-  async function adjustProduct(product: Product, delta: 1 | -1) {
-    if (!canMutate || !lockProduct(product.id)) return
-    try {
-      await adjust.mutateAsync({ product, delta })
-    } catch {
-      // The mutation callback already reconciles and reports the failure.
-    } finally {
-      unlockProduct(product.id)
-    }
-  }
-
-  async function toggleProduct(product: Product) {
-    if (!canMutate || !lockProduct(product.id)) return
-    try {
-      await toggle.mutateAsync(product)
-    } catch {
-      // The mutation callback already reconciles and reports the failure.
-    } finally {
-      unlockProduct(product.id)
-    }
-  }
-
-  async function saveProduct(product: Product, changes: ProductChanges) {
-    if (!canMutate) return
-    if (!lockProduct(product.id)) throw new ApiError('busy', 'Product update already in progress')
-    try {
-      await update.mutateAsync({ product, changes })
-    } finally {
-      unlockProduct(product.id)
-    }
-  }
-
-  async function deleteProduct(product: Product) {
-    if (!canMutate) return
-    if (!lockProduct(product.id)) throw new ApiError('busy', 'Product update already in progress')
-    try {
-      await remove.mutateAsync(product)
-    } finally {
-      unlockProduct(product.id)
-    }
-  }
-
-  async function restoreAllProducts(options: { clearNotes: boolean; resetQuantities: boolean }) {
-    if (!canMutate || !lockBulk()) return
-    try {
-      await restoreAll.mutateAsync(options)
-    } catch {
-      // The mutation callback already reports the failure; the final refresh is authoritative.
-    } finally {
-      try {
-        await refreshProducts()
-      } finally {
-        unlockBulk()
-      }
-    }
-  }
+  const {
+    products,
+    list,
+    unpicked,
+    picked,
+    duplicate,
+    canCreate,
+    categoryFilterActive,
+    mutationState,
+    online,
+    showConnectionWarning,
+    connectionWarningEligible,
+    activateCreate,
+    adjustProduct,
+    toggleProduct,
+    saveProduct,
+    deleteProduct,
+    restoreAllProducts
+  } = grocery
+  const selectedProduct =
+    selected && selected.household_id === householdId
+      ? (list.find((product) => product.id === selected.id) ?? selected)
+      : null
 
   return (
     <main className="app-shell">
