@@ -122,6 +122,7 @@ export function ProductDrawer({
         className="product-drawer"
         headerAction={
           <button
+            type="button"
             className="icon-button danger-quiet"
             onClick={() => setDeleteOpen(true)}
             disabled={pending || !canMutate}

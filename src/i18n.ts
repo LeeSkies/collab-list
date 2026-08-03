@@ -161,6 +161,7 @@ const resources = {
       conflict:
         'Someone changed this product while you were editing. Your input is preserved; review the latest version and save again.',
       requestFailed: 'That didn’t work. Your input is safe—please try again.',
+      retry: 'Try again',
       timeout: 'The request took too long. Please try again.',
       offline: 'You’re offline. Reconnect to load or change the list.',
       householdReadOnly:
@@ -443,6 +444,7 @@ const resources = {
       invalidNotes: 'אפשר להזין עד 500 תווים בהערות.',
       conflict: 'מישהו שינה את המוצר בזמן העריכה. הטקסט שלכם נשמר—בדקו את הגרסה העדכנית ושמרו שוב.',
       requestFailed: 'הפעולה לא הצליחה. הקלט נשמר ואפשר לנסות שוב.',
+      retry: 'נסו שוב',
       timeout: 'הבקשה ארכה יותר מדי. נסו שוב.',
       offline: 'אין חיבור לרשת. התחברו מחדש כדי לטעון או לשנות את הרשימה.',
       householdReadOnly:

@@ -43,8 +43,7 @@ describe('ConfirmDialog', () => {
     )
 
     const confirm = screen.getByRole('button', { name: 'Discard' })
-    expect(confirm).toHaveClass('button')
-    expect(confirm).not.toHaveAttribute('data-slot')
+    expect(confirm).toHaveAttribute('data-slot', 'button')
   })
 })
 

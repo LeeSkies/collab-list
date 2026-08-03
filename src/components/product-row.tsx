@@ -80,6 +80,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
         transition={{ duration: 0.28, ease: [0.2, 0, 0, 1] }}
       >
         <button
+          type="button"
           className="product-main"
           onClick={onEdit}
           disabled={busy || !canMutate}
@@ -103,6 +104,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
         ) : (
           <div className="quantity-controls" {...childControlProps}>
             <button
+              type="button"
               aria-label={t('minus')}
               disabled={busy || !canMutate || !quantityCanAdjust(product.quantity, -1)}
               onClick={() => onAdjust(-1)}
@@ -110,6 +112,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
               <Minus weight="bold" />
             </button>
             <button
+              type="button"
               className="quantity-value"
               aria-label={`${t('quantity')}: ${product.quantity}`}
               onClick={onEdit}
@@ -118,6 +121,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
               {product.quantity}
             </button>
             <button
+              type="button"
               aria-label={t('plus')}
               disabled={busy || !canMutate || !quantityCanAdjust(product.quantity, 1)}
               onClick={() => onAdjust(1)}
@@ -126,7 +130,7 @@ export const ProductRow = forwardRef<HTMLLIElement, ProductRowProps>(function Pr
             </button>
           </div>
         )}
-        <button className="sr-only" onClick={onToggle} disabled={busy || !canMutate}>
+        <button type="button" className="sr-only" onClick={onToggle} disabled={busy || !canMutate}>
           {product.is_picked ? t('restore') : t('pick')}
         </button>
       </motion.article>

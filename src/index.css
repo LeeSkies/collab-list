@@ -65,14 +65,20 @@ body {
   margin: 0;
   background: var(--background);
 }
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-button:not([data-slot='button']):not(.button) {
-  color: inherit;
+/* Form-control reset must live in a layer so Tailwind utilities (e.g. text-sm,
+   font-medium on the shared Button) can override it. Unlayered rules would win. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  /* Same reasoning as the font reset: keep this in a layer so text-color
+     utilities (e.g. text-secondary-foreground on Dialog.Close buttons) win. */
+  button:not([data-slot='button']) {
+    color: inherit;
+  }
 }
 button:not(:disabled) {
   cursor: pointer;
@@ -105,38 +111,16 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='none' stroke='%232d5136' stroke-width='2'%3E%3Cpath d='M20 31c14-13 28-3 24 12-14 3-24-1-24-12Zm87 13c0-13 10-22 23-22 0 13-10 22-23 22ZM42 118h32l-4 25H47Z'/%3E%3Cpath d='M50 118c1-9 17-9 18 0M121 104c13-5 26 6 23 20-14 1-23-6-23-20ZM132 103v-13'/%3E%3Cpath d='M87 76h8v28h-8zM84 82h14'/%3E%3C/g%3E%3C/svg%3E");
 }
 
-.button {
-  min-height: 40px;
-  padding: 0.7rem 1rem;
-  border: 0;
-  border-radius: 0.75rem;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-weight: 700;
-  transition-property: background-color, scale;
-  transition-duration: 150ms;
-}
-.button:active {
-  scale: 0.96;
-}
-.button.secondary {
-  background: var(--secondary);
-  color: var(--secondary-foreground);
-}
-.button.danger {
-  background: var(--destructive);
-  color: white;
-}
 .icon-button {
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   place-items: center;
   border: 0;
   border-radius: 50%;
   background: transparent;
-  transition-property: background-color, scale;
+  transition-property: background-color, scale, opacity;
   transition-duration: 150ms;
 }
 .icon-button:hover {
@@ -144,6 +128,16 @@ body::before {
 }
 .icon-button:active {
   scale: 0.96;
+}
+.icon-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.icon-button:disabled:hover {
+  background: transparent;
+}
+.icon-button:disabled:active {
+  scale: 1;
 }
 .icon-button svg {
   width: 20px;
@@ -315,10 +309,6 @@ body::before {
 }
 .invite-request-card {
   background: color-mix(in oklab, var(--secondary), white 35%);
-}
-.invite-request-card .button {
-  width: 100%;
-  margin-top: 4px;
 }
 .invite-confirmation {
   display: grid;
@@ -700,7 +690,7 @@ body::before {
   scale: 0.96;
 }
 .search-actions > button[aria-disabled='true'] {
-  opacity: 0.28;
+  opacity: 0.5;
 }
 .search-actions > button svg {
   width: 21px;
@@ -777,6 +767,13 @@ body::before {
 .list-control-button:active {
   scale: 0.94;
 }
+/* Shared icon-button primitive targets a 44px interactive box. Compact controls
+   keep their visual size but expand their hit area to the same target. */
+.list-control-button::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
 .list-control-button.is-active {
   background: var(--secondary);
   color: var(--primary);
@@ -804,7 +801,7 @@ body::before {
   height: 12px;
 }
 .product-section h2 .restore-all-button:disabled {
-  opacity: 0.3;
+  opacity: 0.5;
 }
 .category-group + .category-group {
   margin-top: 16px;
@@ -959,7 +956,7 @@ body::before {
   scale: 0.96;
 }
 .quantity-controls button:disabled {
-  opacity: 0.24;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 .quantity-controls svg {
@@ -1341,6 +1338,7 @@ body::before {
 .clear-notes-button:not(:disabled):active {
   scale: 0.96;
 }
+/* Deliberate: the eraser is hidden entirely while there is nothing to clear. */
 .clear-notes-button:disabled {
   opacity: 0;
   pointer-events: none;

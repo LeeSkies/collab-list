@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth'
 import { AccountEmailError, api } from '../lib/api'
 import { AppDrawer } from './drawer'
+import { Button } from './ui/button'
 
 export function AccountDrawer({
   open,
@@ -80,9 +81,9 @@ export function AccountDrawer({
             {error}
           </p>
         )}
-        <button className="button drawer-save" type="submit" disabled={updateEmail.isPending}>
+        <Button className="drawer-save" type="submit" size="lg" disabled={updateEmail.isPending}>
           {updateEmail.isPending ? t('accountEmailSending') : t('accountEmailSend')}
-        </button>
+        </Button>
       </form>
     </AppDrawer>
   )

@@ -1,5 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
+import { Button } from './ui/button'
+
 export class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
   state = { error: false }
   static getDerivedStateFromError() {
@@ -13,7 +15,9 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: b
       return (
         <main className="fatal-error">
           <h1>Something went wrong</h1>
-          <button onClick={() => location.reload()}>Reload</button>
+          <Button type="button" onClick={() => location.reload()}>
+            Reload
+          </Button>
         </main>
       )
     return this.props.children

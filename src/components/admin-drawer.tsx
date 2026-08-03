@@ -524,6 +524,7 @@ export function AdminDrawer({
               </div>
               {user.id !== auth.user?.id && (
                 <button
+                  type="button"
                   className="icon-button danger-quiet"
                   aria-label={`${t('removeMember')} ${user.name}`}
                   onClick={() => setRemoveUser(user)}

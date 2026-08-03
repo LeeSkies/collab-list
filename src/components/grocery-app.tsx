@@ -25,6 +25,7 @@ import { normalizeText, type ProductSortMode } from '../lib/product'
 import type { ProductCategory } from '../lib/product-category'
 import type { Product } from '../lib/types'
 import { useGroceryList } from '../hooks/use-grocery-list'
+import { Button } from './ui/button'
 import { AccountDrawer } from './account-drawer'
 import { AdminDrawer } from './admin-drawer'
 import { CategoryFilterDrawer } from './category-filter-drawer'
@@ -282,6 +283,7 @@ export function GroceryApp() {
                 )}
               </AnimatePresence>
               <button
+                type="button"
                 className="search-add"
                 aria-disabled={!canCreate}
                 aria-label={
@@ -300,6 +302,7 @@ export function GroceryApp() {
           </div>
           {connectionWarningEligible && showConnectionWarning && (
             <button
+              type="button"
               className="connection-banner"
               onClick={() => {
                 void products.refetch()
@@ -360,6 +363,7 @@ export function GroceryApp() {
                 showCount={false}
                 headerAction={
                   <button
+                    type="button"
                     className="icon-button restore-all-button"
                     disabled={
                       !canMutate ||
@@ -519,11 +523,12 @@ function AppHeader({
         <h1>{t('appName')}</h1>
       </div>
       <nav>
-        <button className="icon-button" onClick={onAccount} aria-label={t('account')}>
+        <button type="button" className="icon-button" onClick={onAccount} aria-label={t('account')}>
           <UserCircle />
         </button>
         {auth.profile?.role === 'admin' && (
           <button
+            type="button"
             className="icon-button admin-menu-button"
             onClick={onAdmin}
             aria-label={t('admin')}
@@ -537,13 +542,16 @@ function AppHeader({
           </button>
         )}
         <button
+          type="button"
           className="language-button"
           onClick={() => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}
+          aria-label={t('language')}
         >
           <Globe />
           {i18n.language === 'he' ? 'EN' : 'עב'}
         </button>
         <button
+          type="button"
           className="icon-button"
           onClick={() => void auth.signOut()}
           aria-label={t('logout')}
@@ -569,7 +577,9 @@ function ErrorState({ onRetry }: { onRetry(): void }) {
   return (
     <div className="empty-state">
       <p>{t('requestFailed')}</p>
-      <button onClick={onRetry}>{t('confirm')}</button>
+      <Button type="button" variant="secondary" onClick={onRetry}>
+        {t('retry')}
+      </Button>
     </div>
   )
 }
@@ -589,7 +599,9 @@ function PwaUpdate() {
           exit={{ opacity: 0, y: 8 }}
         >
           <span>{t('updateReady')}</span>
-          <button onClick={() => void updateServiceWorker(true)}>{t('update')}</button>
+          <button type="button" onClick={() => void updateServiceWorker(true)}>
+            {t('update')}
+          </button>
         </motion.aside>
       )}
     </AnimatePresence>

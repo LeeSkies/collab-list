@@ -2,6 +2,7 @@ import { Dialog } from '@base-ui/react/dialog'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Role } from '../lib/types'
+import { Button } from './ui/button'
 
 type TourStep = {
   title: string
@@ -57,14 +58,14 @@ export function ProductTour({ role, onComplete }: { role: Role; onComplete(): Pr
                 {error}
               </p>
             )}
-            <button
-              className="button product-tour-next"
+            <Button
+              className="product-tour-next"
               type="button"
               onClick={() => void next()}
               disabled={pending}
             >
               {t('productTourNext')}
-            </button>
+            </Button>
           </Dialog.Popup>
         </Dialog.Viewport>
       </Dialog.Portal>
