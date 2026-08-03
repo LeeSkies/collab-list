@@ -261,12 +261,10 @@ body::before {
 }
 .login-card form > button {
   width: 100%;
-  min-height: 48px;
   margin-top: 4px;
 }
 .login-create {
   width: 100%;
-  min-height: 48px;
   margin-top: 12px;
 }
 .invite-page {
@@ -452,7 +450,6 @@ body::before {
 }
 .product-tour-next {
   width: 100%;
-  min-height: 48px;
   margin-top: 12px;
 }
 
@@ -767,8 +764,8 @@ body::before {
 .list-control-button:active {
   scale: 0.94;
 }
-/* Shared icon-button primitive targets a 44px interactive box. Compact controls
-   keep their visual size but expand their hit area to the same target. */
+/* Compact list controls keep their visual size but expand their hit area to a
+   44px interactive box via a transparent ::before layer. */
 .list-control-button::before {
   content: '';
   position: absolute;
@@ -1354,10 +1351,6 @@ body::before {
 }
 .drawer-save {
   width: 100%;
-  min-height: 48px;
-}
-.drawer-form > button:nth-last-child(2) {
-  min-height: 44px;
 }
 .confirm-viewport {
   position: fixed;

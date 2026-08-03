@@ -115,9 +115,7 @@ export function CreateHouseholdOnboarding({
               <li>{t('onboardingPointAdmin')}</li>
               <li>{t('onboardingPointTrial')}</li>
             </ul>
-            <Button size="lg" onClick={() => setStep('signup')}>
-              {t('continueToAccount')}
-            </Button>
+            <Button onClick={() => setStep('signup')}>{t('continueToAccount')}</Button>
             {onBack && (
               <Button variant="link" onClick={onBack}>
                 {t('backToSignIn')}
@@ -166,7 +164,7 @@ export function CreateHouseholdOnboarding({
                   {error}
                 </p>
               )}
-              <Button size="lg" type="submit" disabled={pending}>
+              <Button type="submit" disabled={pending}>
                 {pending ? t('creatingAccount') : t('createAccount')}
               </Button>
             </form>
@@ -209,7 +207,7 @@ export function CreateHouseholdOnboarding({
                 {error}
               </p>
             )}
-            <Button size="lg" onClick={() => void createHousehold()} disabled={pending}>
+            <Button onClick={() => void createHousehold()} disabled={pending}>
               {pending ? t('creatingHousehold') : t('confirmCreateHousehold')}
             </Button>
           </>
@@ -227,7 +225,7 @@ export function CreateHouseholdOnboarding({
                 {error}
               </p>
             )}
-            <Button size="lg" onClick={() => void continueToList()} disabled={pending}>
+            <Button onClick={() => void continueToList()} disabled={pending}>
               {pending ? t('continuingToList') : t('continueToList')}
             </Button>
           </>

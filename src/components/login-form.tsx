@@ -117,7 +117,7 @@ export function LoginForm({
                 {error}
               </p>
             )}
-            <Button size="lg" disabled={pending} type="submit">
+            <Button disabled={pending} type="submit">
               {pending ? t('creatingAccount') : t('createAccount')}
             </Button>
             <Button type="button" variant="link" onClick={() => setSignUpOpen(false)}>
@@ -151,7 +151,7 @@ export function LoginForm({
                 {error}
               </p>
             )}
-            <Button size="lg" disabled={pending} type="submit">
+            <Button disabled={pending} type="submit">
               {pending ? t('signingIn') : t('login')}
             </Button>
           </form>
@@ -159,7 +159,6 @@ export function LoginForm({
         {inviteMode && !signUpOpen && !confirmationRequired && (
           <Button
             className="login-create"
-            size="lg"
             variant="secondary"
             onClick={() => {
               setError('')
@@ -170,12 +169,7 @@ export function LoginForm({
           </Button>
         )}
         {showCreateHousehold && onCreateHousehold && (
-          <Button
-            className="login-create"
-            size="lg"
-            variant="secondary"
-            onClick={onCreateHousehold}
-          >
+          <Button className="login-create" variant="secondary" onClick={onCreateHousehold}>
             {t('createHousehold')}
           </Button>
         )}

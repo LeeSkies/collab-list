@@ -4,7 +4,7 @@ import { X } from '@phosphor-icons/react'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Button, buttonVariants } from './ui/button'
+import { Button } from './ui/button'
 
 export function AppDrawer({
   open,
@@ -159,7 +159,7 @@ export function ConfirmDialog({
             <Dialog.Title>{title}</Dialog.Title>
             <Dialog.Description>{body}</Dialog.Description>
             <div className="confirm-actions">
-              <Dialog.Close className={buttonVariants({ variant: 'secondary' })} disabled={pending}>
+              <Dialog.Close render={<Button variant="secondary" />} disabled={pending}>
                 {t('cancel')}
               </Dialog.Close>
               {destructive ? (
@@ -213,9 +213,7 @@ export function ChoiceDialog({
             <Dialog.Description>{body}</Dialog.Description>
             <div className="choice-dialog-options">{children}</div>
             <div className="confirm-actions">
-              <Dialog.Close className={buttonVariants({ variant: 'secondary' })}>
-                {t('cancel')}
-              </Dialog.Close>
+              <Dialog.Close render={<Button variant="secondary" />}>{t('cancel')}</Dialog.Close>
               <Button
                 variant={destructive ? 'destructive' : 'default'}
                 disabled={pending || confirmDisabled}

@@ -1,7 +1,7 @@
 import { Dialog } from '@base-ui/react/dialog'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, buttonVariants } from './ui/button'
+import { Button } from './ui/button'
 
 export function DeleteHouseholdDialog({
   open,
@@ -60,13 +60,12 @@ export function DeleteHouseholdDialog({
               />
             </label>
             <div className="confirm-actions">
-              <Dialog.Close className={buttonVariants({ variant: 'secondary' })} disabled={pending}>
+              <Dialog.Close render={<Button variant="secondary" />} disabled={pending}>
                 {t('cancel')}
               </Dialog.Close>
               <Button
                 type="button"
                 variant="destructive"
-                size="lg"
                 disabled={!canConfirm || pending}
                 onClick={() => onConfirm(purgeNow)}
               >

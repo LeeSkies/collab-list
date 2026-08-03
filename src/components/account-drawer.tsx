@@ -81,7 +81,7 @@ export function AccountDrawer({
             {error}
           </p>
         )}
-        <Button className="drawer-save" type="submit" size="lg" disabled={updateEmail.isPending}>
+        <Button className="drawer-save" type="submit" disabled={updateEmail.isPending}>
           {updateEmail.isPending ? t('accountEmailSending') : t('accountEmailSend')}
         </Button>
       </form>

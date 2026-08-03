@@ -50,7 +50,7 @@ export function DeletedHouseholdScreen({ household }: { household: DeletedHouseh
           {error}
         </p>
       )}
-      <Button type="button" size="lg" onClick={() => recover.mutate()} disabled={recover.isPending}>
+      <Button type="button" onClick={() => recover.mutate()} disabled={recover.isPending}>
         {recover.isPending ? t('recoveringHousehold') : t('recoverHousehold')}
       </Button>
     </main>

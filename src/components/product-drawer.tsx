@@ -136,7 +136,6 @@ export function ProductDrawer({
             className="drawer-save"
             type="submit"
             form={formId}
-            size="lg"
             disabled={!dirty || Boolean(validation) || pending || !canMutate}
           >
             {pending ? t('saving') : t('save')}
@@ -234,7 +233,6 @@ export function ProductDrawer({
           <Button
             type="button"
             variant="secondary"
-            size="lg"
             disabled={pending || !canMutate}
             onClick={() => onToggle(product)}
           >

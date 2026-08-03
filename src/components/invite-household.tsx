@@ -196,7 +196,7 @@ function InviteRequestPanel({
                   : t('requestFailed')}
         </p>
       )}
-      <Button size="lg" onClick={() => join.mutate()} disabled={join.isPending || !preview}>
+      <Button onClick={() => join.mutate()} disabled={join.isPending || !preview}>
         {join.isPending ? t('inviteRequesting') : t('inviteRequestAccess')}
       </Button>
     </section>

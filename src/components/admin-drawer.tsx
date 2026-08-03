@@ -361,7 +361,6 @@ export function AdminDrawer({
           {copied && <small role="status">{t('inviteCopied')}</small>}
           <Button
             type="button"
-            size="lg"
             onClick={() => createInvite.mutate()}
             disabled={createInvite.isPending || !canMutate}
           >
@@ -436,7 +435,6 @@ export function AdminDrawer({
                   {planAction === 'subscribe' && (
                     <Button
                       type="button"
-                      size="lg"
                       onClick={() => setPendingAction('subscribe')}
                       disabled={billingAction.isPending}
                     >
@@ -446,7 +444,6 @@ export function AdminDrawer({
                   {planAction === 'cancel' && (
                     <Button
                       type="button"
-                      size="lg"
                       variant="outline"
                       onClick={() => setPendingAction('cancel_at_period_end')}
                       disabled={billingAction.isPending}
@@ -457,7 +454,6 @@ export function AdminDrawer({
                   {planAction === 'resubscribe' && (
                     <Button
                       type="button"
-                      size="lg"
                       onClick={() => setPendingAction('resubscribe')}
                       disabled={billingAction.isPending}
                     >
@@ -481,7 +477,6 @@ export function AdminDrawer({
           <p>{t('resetHouseholdDescription')}</p>
           <Button
             type="button"
-            size="lg"
             variant="destructive"
             onClick={() => setResetOpen(true)}
             disabled={reset.isPending || !canMutate}
@@ -497,7 +492,6 @@ export function AdminDrawer({
           <p>{t('deleteHouseholdDescription')}</p>
           <Button
             type="button"
-            size="lg"
             variant="destructive"
             onClick={() => setDeleteOpen(true)}
             disabled={deleteHousehold.isPending}
