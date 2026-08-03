@@ -32,10 +32,17 @@ export class ProductMutationCoordinator {
   }
 }
 
-export function rollbackOptimisticProduct<T>(
+export interface RevisionedProduct {
+  id: string
+  version: number
+}
+
+export function rollbackOptimisticProduct<T extends RevisionedProduct>(
   products: readonly T[],
   optimistic: T,
   previous: T
 ): T[] {
-  return products.map((product) => (product === optimistic ? previous : product))
+  return products.map((product) =>
+    product.id === optimistic.id && product.version === optimistic.version ? previous : product
+  )
 }

@@ -34,7 +34,7 @@ describe('ProductMutationCoordinator', () => {
 })
 
 describe('rollbackOptimisticProduct', () => {
-  it('restores only its own optimistic object and preserves unrelated changes', () => {
+  it('restores only its own optimistic revision and preserves unrelated changes', () => {
     const previousA = { id: 'a', version: 1 }
     const optimisticA = { id: 'a', version: 2 }
     const successfulB = { id: 'b', version: 4 }
@@ -45,13 +45,31 @@ describe('rollbackOptimisticProduct', () => {
     ])
   })
 
-  it('does not overwrite an authoritative replacement of the optimistic object', () => {
+  it('reverts a recreated object for the same id and version (identity-independent)', () => {
+    // Realtime/cache replacement can hand back new objects for the same product.
     const previous = { id: 'a', version: 1 }
     const optimistic = { id: 'a', version: 2 }
-    const authoritative = { id: 'a', version: 3 }
+    const echo = { id: 'a', version: 2, name: 'reconstructed echo' }
+
+    expect(rollbackOptimisticProduct([echo], optimistic, previous)).toEqual([previous])
+  })
+
+  it('does not overwrite an authoritative replacement at a newer revision', () => {
+    const previous = { id: 'a', version: 1 }
+    const optimistic = { id: 'a', version: 2 }
+    const authoritative = { id: 'a', version: 3, picked: true }
 
     expect(rollbackOptimisticProduct([authoritative], optimistic, previous)).toEqual([
       authoritative
     ])
+  })
+
+  it('does not resurrect a row that no longer carries the optimistic revision', () => {
+    const previous = { id: 'a', version: 1 }
+    const optimistic = { id: 'a', version: 2 }
+    const unrelated = { id: 'b', version: 5 }
+
+    // The optimistic row is gone; a stale failure must not insert it back.
+    expect(rollbackOptimisticProduct([unrelated], optimistic, previous)).toEqual([unrelated])
   })
 })
