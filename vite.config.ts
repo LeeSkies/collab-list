@@ -17,24 +17,24 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['icons/*.svg'],
+      includeAssets: ['icons/*.svg', 'icons/*.png'],
       manifest: {
         name: 'Our Groceries',
         short_name: 'Groceries',
         description: 'A calm shared grocery list',
-        theme_color: '#f6f1e7',
+        theme_color: '#2f6041',
         background_color: '#2f6041',
         display: 'standalone',
         start_url: base,
         scope: base,
         icons: [
-          { src: `${base}icons/icon.svg`, sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
           {
-            src: `${base}icons/icon-maskable.svg`,
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: `${base}icons/launch-icon-512.png`,
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'maskable'
-          }
+          },
+          { src: `${base}icons/icon.svg`, sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
         ]
       },
       workbox: {

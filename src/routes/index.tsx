@@ -5,7 +5,6 @@ import { useAuth } from '../auth'
 import { CreateHouseholdOnboarding } from '../components/create-household-onboarding'
 import { DeletedHouseholdScreen } from '../components/deleted-household-screen'
 import { GroceryApp } from '../components/grocery-app'
-import { SplashScreen } from '../components/splash-screen'
 import { LoginForm } from '../components/login-form'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { api } from '../lib/api'
@@ -33,7 +32,8 @@ function Home() {
         </p>
       </main>
     )
-  if (auth.restoring) return <SplashScreen />
+  // Installed PWAs show the native manifest splash while auth restoration completes.
+  if (auth.restoring) return null
   if (auth.session) {
     if (deletedHousehold.data) return <DeletedHouseholdScreen household={deletedHousehold.data} />
     if (auth.profile?.household_id && !onboardingOpen) return <GroceryApp />
