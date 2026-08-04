@@ -63,7 +63,7 @@ describe('home route startup', () => {
     authState.restoring = true
   })
 
-  it('keeps the branded startup screen visible while auth restores', () => {
+  it('keeps the startup loading status visible while auth restores', () => {
     renderHome()
 
     expect(screen.getByRole('status', { name: i18n.t('loading') })).toBeVisible()

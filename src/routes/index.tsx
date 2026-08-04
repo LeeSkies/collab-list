@@ -5,8 +5,8 @@ import { useAuth } from '../auth'
 import { CreateHouseholdOnboarding } from '../components/create-household-onboarding'
 import { DeletedHouseholdScreen } from '../components/deleted-household-screen'
 import { GroceryApp } from '../components/grocery-app'
+import { LeafLoader } from '../components/leaf-loader'
 import { LoginForm } from '../components/login-form'
-import { SplashScreen } from '../components/splash-screen'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { api } from '../lib/api'
 
@@ -33,8 +33,12 @@ function Home() {
         </p>
       </main>
     )
-  // The native launch splash hands off to this matching screen while auth restores.
-  if (auth.restoring) return <SplashScreen />
+  if (auth.restoring)
+    return (
+      <main className="loading-page">
+        <LeafLoader />
+      </main>
+    )
   if (auth.session) {
     if (deletedHousehold.data) return <DeletedHouseholdScreen household={deletedHousehold.data} />
     if (auth.profile?.household_id && !onboardingOpen) return <GroceryApp />
