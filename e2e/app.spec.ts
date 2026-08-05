@@ -130,11 +130,30 @@ test('drawers animate into view', async ({ page }) => {
     .toBe(0)
 })
 
-test('switches direction and persists language', async ({ page }) => {
+test('switches direction and persists language from settings', async ({ page }) => {
   await login(page)
   const before = await page.locator('html').getAttribute('dir')
-  await page.locator('.language-button').click()
+  await page.getByRole('button', { name: /settings|הגדרות/i }).click()
+  await page.getByRole('button', { name: /^language$|^שפה$/i }).click()
+  await page.getByRole('button', { name: 'עברית' }).click()
   await expect(page.locator('html')).not.toHaveAttribute('dir', before ?? '')
   await page.reload()
   await expect(page.locator('html')).not.toHaveAttribute('dir', before ?? '')
+})
+
+test('adds and deletes a category from settings with a destructive warning', async ({ page }) => {
+  await login(page)
+  const name = `Cheese ${Date.now()}`
+  await page.getByRole('button', { name: /settings|הגדרות/i }).click()
+  await page.getByRole('button', { name: /^categories$|^קטגוריות$/i }).click()
+  await page
+    .getByRole('textbox', { name: /find or add a category|חפשו או הוסיפו קטגוריה/i })
+    .fill(name)
+  await page.getByRole('button', { name: /^add category$|^הוספת קטגוריה$/i }).click()
+  await expect(page.getByText(name, { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: `Delete ${name}` }).click()
+  await expect(page.getByRole('heading', { name: `Delete ${name}?` })).toBeVisible()
+  await page.getByRole('button', { name: /^delete category$|^מחיקת קטגוריה$/i }).click()
+  await expect(page.getByText(name, { exact: true })).toHaveCount(0)
 })

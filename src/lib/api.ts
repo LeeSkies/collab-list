@@ -44,6 +44,62 @@ export interface AccountEmailUpdateResult {
   confirmationRequired: true
 }
 
+export type CategoryErrorCode =
+  | 'duplicate'
+  | 'invalid_name'
+  | 'category_not_found'
+  | 'cannot_delete_other'
+  | 'admin_required'
+  | 'default_category_missing'
+  | 'household_read_only'
+  | 'household_entitlement_locked'
+  | 'category_failed'
+
+export class CategoryError extends ApiError {
+  declare public code: CategoryErrorCode
+
+  constructor(code: CategoryErrorCode, message: string) {
+    super(code, message)
+  }
+}
+
+function categoryError(error: { code?: string; message: string }) {
+  const message = error.message ?? ''
+  if (error.code === '23505' || message.includes('categories_household_name_key')) {
+    return new CategoryError('duplicate', 'A category with this name already exists')
+  }
+  if (error.code === '22023' || message === 'invalid_category_name') {
+    return new CategoryError('invalid_name', 'Enter a category name between 1 and 80 characters')
+  }
+  if (error.code === 'P0002' || message === 'category_not_found') {
+    return new CategoryError('category_not_found', 'That category no longer exists')
+  }
+  if (message === 'cannot_delete_other') {
+    return new CategoryError('cannot_delete_other', "The other category can't be deleted")
+  }
+  if (message === 'admin_required') {
+    return new CategoryError('admin_required', 'Only the household admin can delete categories')
+  }
+  if (message === 'default_category_missing') {
+    return new CategoryError(
+      'default_category_missing',
+      'The household default category is missing'
+    )
+  }
+  if (message === 'household_read_only') {
+    return new CategoryError('household_read_only', message)
+  }
+  if (message === 'household_entitlement_locked') {
+    return new CategoryError('household_entitlement_locked', message)
+  }
+  return new CategoryError('category_failed', message)
+}
+
+function categoryMutationError(reason: unknown): never {
+  if (reason instanceof ApiError) throw categoryError(reason)
+  throw reason
+}
+
 function accountEmailError(error: { code?: string; message: string; status?: number }) {
   const message = error.message.toLowerCase()
   if (
@@ -222,7 +278,22 @@ export const api = {
       unwrap<Category[]>(
         supabase.from('categories').select('*').order('name', { ascending: true }),
         signal
-      )
+      ),
+    create: async (name: string) => {
+      try {
+        const rows = await unwrap<Category[]>(supabase.rpc('create_category', { p_name: name }))
+        return rows[0]!
+      } catch (reason) {
+        categoryMutationError(reason)
+      }
+    },
+    remove: async (categoryId: string) => {
+      try {
+        await unwrap<boolean>(supabase.rpc('delete_category', { p_category_id: categoryId }))
+      } catch (reason) {
+        categoryMutationError(reason)
+      }
+    }
   },
   profile: {
     current: (id: string) =>
@@ -400,16 +471,43 @@ export const api = {
       householdId: string
     ): RealtimeChannel {
       if (!householdId) throw new ApiError('household_required', 'A household is required')
-      const change = {
+      const productChange = {
         event: '*' as const,
         schema: 'public' as const,
         table: 'products' as const,
         filter: `household_id=eq.${householdId}`
       }
-      return supabase
+      const categoryChange = {
+        event: '*' as const,
+        schema: 'public' as const,
+        table: 'categories' as const,
+        filter: `household_id=eq.${householdId}`
+      }
+      let productsSubscribed = false
+      let categoriesSubscribed = false
+      const statusFor = (kind: 'products' | 'categories') => (status: string) => {
+        if (status === 'SUBSCRIBED') {
+          if (kind === 'products') productsSubscribed = true
+          else categoriesSubscribed = true
+          if (productsSubscribed && categoriesSubscribed) onStatus('SUBSCRIBED')
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          onStatus(status)
+        }
+      }
+      const productsChannel = supabase
         .channel(`household-products:${householdId}`)
-        .on('postgres_changes', change, onChange)
-        .subscribe(onStatus)
+        .on('postgres_changes', productChange, onChange)
+        .subscribe(statusFor('products'))
+      const categoriesChannel = supabase
+        .channel(`household-categories:${householdId}`)
+        .on('postgres_changes', categoryChange, onChange)
+        .subscribe(statusFor('categories'))
+      return {
+        unsubscribe() {
+          void productsChannel.unsubscribe()
+          void categoriesChannel.unsubscribe()
+        }
+      } as unknown as RealtimeChannel
     }
   }
 }

@@ -25,9 +25,14 @@ function isLiveSubscription(subscription: HouseholdSubscription) {
 }
 
 function formatPlanDate(iso: string, locale: string) {
-  return new Intl.DateTimeFormat(locale === 'he' ? 'he-IL' : 'en-GB', {
-    dateStyle: 'medium'
-  }).format(new Date(iso))
+  const dateLocale = locale.startsWith('ar')
+    ? 'ar-EG'
+    : locale.startsWith('fr')
+      ? 'fr-FR'
+      : locale.startsWith('he')
+        ? 'he-IL'
+        : 'en-GB'
+  return new Intl.DateTimeFormat(dateLocale, { dateStyle: 'medium' }).format(new Date(iso))
 }
 
 function planActionFor(
@@ -120,11 +125,14 @@ function planSummaryFor(
 export function AdminDrawer({
   open,
   onOpenChange,
-  canMutate = true
+  canMutate = true,
+  embedded = false
 }: {
   open: boolean
   onOpenChange(open: boolean): void
   canMutate?: boolean
+  /** Render only the content (and dialogs) for embedding in the settings hub. */
+  embedded?: boolean
 }) {
   const { t, i18n } = useTranslation()
   const auth = useAuth()
@@ -328,209 +336,213 @@ export function AdminDrawer({
     t
   )
 
-  return (
+  const content = (
     <>
-      <AppDrawer
-        open={open}
-        onOpenChange={onOpenChange}
-        title={t('users')}
-        className="admin-drawer"
-      >
-        <section className="invite-management">
-          <div className="section-title">
-            <LinkSimple />
-            <strong>{t('inviteMember')}</strong>
+      <section className="invite-management">
+        <div className="section-title">
+          <LinkSimple />
+          <strong>{t('inviteMember')}</strong>
+        </div>
+        <p>{t('inviteLinkReady')}</p>
+        {inviteLink && (
+          <div className="invite-link-row">
+            <input value={inviteLink} readOnly aria-label={t('inviteMember')} />
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={t('copyInvite')}
+              onClick={() => {
+                void navigator.clipboard?.writeText(inviteLink)
+                setCopied(true)
+              }}
+            >
+              {copied ? <Check /> : <Copy />}
+            </button>
           </div>
-          <p>{t('inviteLinkReady')}</p>
-          {inviteLink && (
-            <div className="invite-link-row">
-              <input value={inviteLink} readOnly aria-label={t('inviteMember')} />
+        )}
+        {copied && <small role="status">{t('inviteCopied')}</small>}
+        <Button
+          type="button"
+          onClick={() => createInvite.mutate()}
+          disabled={createInvite.isPending || !canMutate}
+        >
+          {createInvite.isPending
+            ? t('inviteRequesting')
+            : inviteLink
+              ? t('rotateInvite')
+              : t('generateInvite')}
+        </Button>
+      </section>
+      <section className="pending-requests">
+        <div className="section-title">
+          <UserPlus />
+          <strong>{t('pendingRequests')}</strong>
+          {pendingRequests.data && pendingRequests.data.length > 0 && (
+            <span className="pending-count">{pendingRequests.data.length}</span>
+          )}
+        </div>
+        {pendingRequests.data?.length ? (
+          <div className="pending-request-list">
+            {pendingRequests.data.map((request) => (
+              <article key={request.requestId}>
+                <div>
+                  <strong>{request.name}</strong>
+                  <small>{request.email}</small>
+                </div>
+                <div className="pending-request-actions">
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`${t('approve')} ${request.name}`}
+                    disabled={handleRequest.isPending || !canMutate}
+                    onClick={() => approveClick(request)}
+                  >
+                    <Check />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button danger-quiet"
+                    aria-label={`${t('reject')} ${request.name}`}
+                    disabled={handleRequest.isPending || !canMutate}
+                    onClick={() =>
+                      handleRequest.mutate({ requestId: request.requestId, approve: false })
+                    }
+                  >
+                    <X />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="admin-empty">{t('noPendingRequests')}</p>
+        )}
+      </section>
+      <section className="plan-management">
+        <div className="section-title">
+          <CreditCard />
+          <strong>{t('plan')}</strong>
+        </div>
+        {subscription.data ? (
+          <>
+            <p className="plan-summary">{planSummary.title}</p>
+            <p className="admin-empty">{planSummary.detail}</p>
+            {planNotice && (
+              <small className="plan-notice" role="status">
+                {planNotice}
+              </small>
+            )}
+            {subscription.data.billing_enabled && (
+              <div className="plan-actions">
+                {planAction === 'subscribe' && (
+                  <Button
+                    type="button"
+                    onClick={() => setPendingAction('subscribe')}
+                    disabled={billingAction.isPending}
+                  >
+                    {t('planSubscribe')}
+                  </Button>
+                )}
+                {planAction === 'cancel' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setPendingAction('cancel_at_period_end')}
+                    disabled={billingAction.isPending}
+                  >
+                    {t('planCancel')}
+                  </Button>
+                )}
+                {planAction === 'resubscribe' && (
+                  <Button
+                    type="button"
+                    onClick={() => setPendingAction('resubscribe')}
+                    disabled={billingAction.isPending}
+                  >
+                    {t('planResubscribe')}
+                  </Button>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="admin-empty">{t('loading')}</p>
+        )}
+      </section>
+      <section className="reset-management">
+        <div className="section-title">
+          <Trash />
+          <strong>{t('resetHousehold')}</strong>
+        </div>
+        <p>{t('resetHouseholdDescription')}</p>
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => setResetOpen(true)}
+          disabled={reset.isPending || !canMutate}
+        >
+          {t('resetHousehold')}
+        </Button>
+      </section>
+      <section className="reset-management">
+        <div className="section-title">
+          <Trash />
+          <strong>{t('deleteHousehold')}</strong>
+        </div>
+        <p>{t('deleteHouseholdDescription')}</p>
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => setDeleteOpen(true)}
+          disabled={deleteHousehold.isPending}
+        >
+          {t('deleteHousehold')}
+        </Button>
+      </section>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="user-list">
+        {users.data?.map((user) => (
+          <article key={user.id}>
+            <div className="avatar">{user.name.slice(0, 1).toLocaleUpperCase()}</div>
+            <div>
+              <strong>{user.name}</strong>
+              <small>{user.email}</small>
+              <span>
+                {user.role === 'admin' ? 'Admin' : t('member')}
+                {user.id === auth.user?.id ? ` · ${t('currentUser')}` : ''}
+              </span>
+            </div>
+            {user.id !== auth.user?.id && (
               <button
                 type="button"
-                className="icon-button"
-                aria-label={t('copyInvite')}
-                onClick={() => {
-                  void navigator.clipboard?.writeText(inviteLink)
-                  setCopied(true)
-                }}
+                className="icon-button danger-quiet"
+                aria-label={`${t('removeMember')} ${user.name}`}
+                onClick={() => setRemoveUser(user)}
+                disabled={!canMutate || remove.isPending}
               >
-                {copied ? <Check /> : <Copy />}
+                <Trash />
               </button>
-            </div>
-          )}
-          {copied && <small role="status">{t('inviteCopied')}</small>}
-          <Button
-            type="button"
-            onClick={() => createInvite.mutate()}
-            disabled={createInvite.isPending || !canMutate}
-          >
-            {createInvite.isPending
-              ? t('inviteRequesting')
-              : inviteLink
-                ? t('rotateInvite')
-                : t('generateInvite')}
-          </Button>
-        </section>
-        <section className="pending-requests">
-          <div className="section-title">
-            <UserPlus />
-            <strong>{t('pendingRequests')}</strong>
-            {pendingRequests.data && pendingRequests.data.length > 0 && (
-              <span className="pending-count">{pendingRequests.data.length}</span>
             )}
-          </div>
-          {pendingRequests.data?.length ? (
-            <div className="pending-request-list">
-              {pendingRequests.data.map((request) => (
-                <article key={request.requestId}>
-                  <div>
-                    <strong>{request.name}</strong>
-                    <small>{request.email}</small>
-                  </div>
-                  <div className="pending-request-actions">
-                    <button
-                      type="button"
-                      className="icon-button"
-                      aria-label={`${t('approve')} ${request.name}`}
-                      disabled={handleRequest.isPending || !canMutate}
-                      onClick={() => approveClick(request)}
-                    >
-                      <Check />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button danger-quiet"
-                      aria-label={`${t('reject')} ${request.name}`}
-                      disabled={handleRequest.isPending || !canMutate}
-                      onClick={() =>
-                        handleRequest.mutate({ requestId: request.requestId, approve: false })
-                      }
-                    >
-                      <X />
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="admin-empty">{t('noPendingRequests')}</p>
-          )}
-        </section>
-        <section className="plan-management">
-          <div className="section-title">
-            <CreditCard />
-            <strong>{t('plan')}</strong>
-          </div>
-          {subscription.data ? (
-            <>
-              <p className="plan-summary">{planSummary.title}</p>
-              <p className="admin-empty">{planSummary.detail}</p>
-              {planNotice && (
-                <small className="plan-notice" role="status">
-                  {planNotice}
-                </small>
-              )}
-              {subscription.data.billing_enabled ? (
-                <div className="plan-actions">
-                  {planAction === 'subscribe' && (
-                    <Button
-                      type="button"
-                      onClick={() => setPendingAction('subscribe')}
-                      disabled={billingAction.isPending}
-                    >
-                      {t('planSubscribe')}
-                    </Button>
-                  )}
-                  {planAction === 'cancel' && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setPendingAction('cancel_at_period_end')}
-                      disabled={billingAction.isPending}
-                    >
-                      {t('planCancel')}
-                    </Button>
-                  )}
-                  {planAction === 'resubscribe' && (
-                    <Button
-                      type="button"
-                      onClick={() => setPendingAction('resubscribe')}
-                      disabled={billingAction.isPending}
-                    >
-                      {t('planResubscribe')}
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <p className="admin-empty">{t('planBillingUnavailable')}</p>
-              )}
-            </>
-          ) : (
-            <p className="admin-empty">{t('loading')}</p>
-          )}
-        </section>
-        <section className="reset-management">
-          <div className="section-title">
-            <Trash />
-            <strong>{t('resetHousehold')}</strong>
-          </div>
-          <p>{t('resetHouseholdDescription')}</p>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => setResetOpen(true)}
-            disabled={reset.isPending || !canMutate}
-          >
-            {t('resetHousehold')}
-          </Button>
-        </section>
-        <section className="reset-management">
-          <div className="section-title">
-            <Trash />
-            <strong>{t('deleteHousehold')}</strong>
-          </div>
-          <p>{t('deleteHouseholdDescription')}</p>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => setDeleteOpen(true)}
-            disabled={deleteHousehold.isPending}
-          >
-            {t('deleteHousehold')}
-          </Button>
-        </section>
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="user-list">
-          {users.data?.map((user) => (
-            <article key={user.id}>
-              <div className="avatar">{user.name.slice(0, 1).toLocaleUpperCase()}</div>
-              <div>
-                <strong>{user.name}</strong>
-                <small>{user.email}</small>
-                <span>
-                  {user.role === 'admin' ? 'Admin' : t('member')}
-                  {user.id === auth.user?.id ? ` · ${t('currentUser')}` : ''}
-                </span>
-              </div>
-              {user.id !== auth.user?.id && (
-                <button
-                  type="button"
-                  className="icon-button danger-quiet"
-                  aria-label={`${t('removeMember')} ${user.name}`}
-                  onClick={() => setRemoveUser(user)}
-                  disabled={!canMutate || remove.isPending}
-                >
-                  <Trash />
-                </button>
-              )}
-            </article>
-          ))}
-        </div>
-      </AppDrawer>
+          </article>
+        ))}
+      </div>
+    </>
+  )
+
+  const shell = embedded ? null : (
+    <AppDrawer open={open} onOpenChange={onOpenChange} title={t('users')} className="admin-drawer">
+      {content}
+    </AppDrawer>
+  )
+
+  return (
+    <>
+      {shell}
+      {embedded && content}
       <DeleteHouseholdDialog
         key={deleteOpen ? 'delete-household-open' : 'delete-household-closed'}
         open={deleteOpen}

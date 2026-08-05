@@ -125,7 +125,7 @@ describe('AdminDrawer', () => {
 
     renderDrawer()
 
-    const resetButton = await screen.findByRole('button', { name: /^Reset household$/ })
+    const resetButton = await screen.findByRole('button', { name: /^Reset account$/ })
     await user.click(resetButton)
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
 
@@ -149,9 +149,9 @@ describe('AdminDrawer', () => {
 
     renderDrawer(client)
 
-    await user.click(await screen.findByRole('button', { name: /^Delete household$/ }))
+    await user.click(await screen.findByRole('button', { name: /^Delete account$/ }))
     const dialog = screen.getByRole('dialog', { name: 'Delete this household?' })
-    const action = within(dialog).getByRole('button', { name: /^Delete household$/ })
+    const action = within(dialog).getByRole('button', { name: /^Delete account$/ })
     expect(action).toBeDisabled()
     await user.type(within(dialog).getByRole('textbox'), 'DELETE')
     expect(action).toBeEnabled()
@@ -216,8 +216,8 @@ describe('AdminDrawer', () => {
 
     expect(await screen.findByText('Plan')).toBeVisible()
     expect(await screen.findByText(/Free trial until \d{1,2} Aug 2026\./)).toBeVisible()
-    expect(await screen.findByText('2 of 5 member seats used.')).toBeVisible()
-    expect(screen.getByText('Billing is not available yet.')).toBeVisible()
+    expect(await screen.findByText('2 active accounts (limited to 5).')).toBeVisible()
+    expect(screen.queryByText('Billing is not available yet.')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Subscribe' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel at period end' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Resubscribe' })).not.toBeInTheDocument()

@@ -9,7 +9,14 @@ const { auth, channel, from, rpc } = vi.hoisted(() => ({
 
 vi.mock('./supabase', () => ({ supabase: { auth, channel, from, rpc } }))
 
-import { AccountEmailError, api, ApiError, isApiErrorCode, isProductConflict } from './api'
+import {
+  AccountEmailError,
+  api,
+  ApiError,
+  CategoryError,
+  isApiErrorCode,
+  isProductConflict
+} from './api'
 
 describe('account.updateEmail', () => {
   beforeEach(() => auth.updateUser.mockReset())
@@ -191,6 +198,75 @@ describe('categories.list', () => {
     expect(from).toHaveBeenCalledWith('categories')
     expect(select).toHaveBeenCalledWith('*')
     expect(order).toHaveBeenCalledWith('name', { ascending: true })
+  })
+})
+
+describe('categories.create', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('creates a category through the scoped RPC and returns the stored row', async () => {
+    rpc.mockResolvedValue({
+      data: [{ id: 'cat-new', household_id: 'household-a', name: 'baking' }],
+      error: null
+    })
+
+    await expect(api.categories.create('  baking  ')).resolves.toEqual({
+      id: 'cat-new',
+      household_id: 'household-a',
+      name: 'baking'
+    })
+    expect(rpc).toHaveBeenCalledWith('create_category', { p_name: '  baking  ' })
+  })
+
+  it('maps a duplicate unique violation to a typed CategoryError', async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "categories_household_name_key"'
+      }
+    })
+
+    await expect(api.categories.create('baking')).rejects.toMatchObject({ code: 'duplicate' })
+    await expect(api.categories.create('baking')).rejects.toBeInstanceOf(CategoryError)
+  })
+
+  it('maps invalid names to a typed CategoryError', async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { code: '22023', message: 'invalid_category_name' }
+    })
+
+    await expect(api.categories.create('   ')).rejects.toMatchObject({ code: 'invalid_name' })
+  })
+})
+
+describe('categories.remove', () => {
+  beforeEach(() => rpc.mockReset())
+
+  it('deletes a category through the admin RPC', async () => {
+    rpc.mockResolvedValue({ data: true, error: null })
+
+    await expect(api.categories.remove('cat-1')).resolves.toBeUndefined()
+    expect(rpc).toHaveBeenCalledWith('delete_category', { p_category_id: 'cat-1' })
+  })
+
+  it.each([
+    ['P0002', 'category_not_found', 'category_not_found'],
+    ['P0001', 'cannot_delete_other', 'cannot_delete_other'],
+    ['P0001', 'default_category_missing', 'default_category_missing'],
+    ['42501', 'admin_required', 'admin_required'],
+    ['42501', 'household_read_only', 'household_read_only']
+  ] as const)('maps %s %s to a typed %s error', async (code, message, expected) => {
+    rpc.mockResolvedValue({ data: null, error: { code, message } })
+
+    await expect(api.categories.remove('cat-1')).rejects.toMatchObject({ code: expected })
+  })
+
+  it('keeps unrelated failures as a category_failed error', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
+
+    await expect(api.categories.remove('cat-1')).rejects.toMatchObject({ code: 'category_failed' })
   })
 })
 
@@ -407,7 +483,7 @@ describe('realtime subscription', () => {
     expect(channel).not.toHaveBeenCalled()
   })
 
-  it('filters product changes to the current household', () => {
+  it('subscribes to product and category changes for the current household', () => {
     const on = vi.fn().mockReturnThis()
     const subscribe = vi.fn()
     channel.mockReturnValue({ on, subscribe })
@@ -415,12 +491,25 @@ describe('realtime subscription', () => {
     api.realtime.subscribe(vi.fn(), vi.fn(), '20000000-0000-0000-0000-000000000001')
 
     expect(channel).toHaveBeenCalledWith('household-products:20000000-0000-0000-0000-000000000001')
+    expect(channel).toHaveBeenCalledWith(
+      'household-categories:20000000-0000-0000-0000-000000000001'
+    )
     expect(on).toHaveBeenCalledWith(
       'postgres_changes',
       {
         event: '*',
         schema: 'public',
         table: 'products',
+        filter: 'household_id=eq.20000000-0000-0000-0000-000000000001'
+      },
+      expect.any(Function)
+    )
+    expect(on).toHaveBeenCalledWith(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'categories',
         filter: 'household_id=eq.20000000-0000-0000-0000-000000000001'
       },
       expect.any(Function)

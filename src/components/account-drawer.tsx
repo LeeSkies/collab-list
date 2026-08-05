@@ -8,10 +8,13 @@ import { Button } from './ui/button'
 
 export function AccountDrawer({
   open,
-  onOpenChange
+  onOpenChange,
+  embedded = false
 }: {
   open: boolean
   onOpenChange(open: boolean): void
+  /** Render only the content for embedding inside the settings hub. */
+  embedded?: boolean
 }) {
   const { t } = useTranslation()
   const auth = useAuth()
@@ -43,48 +46,54 @@ export function AccountDrawer({
     }
   })
 
+  const content = (
+    <form
+      className="drawer-form account-form"
+      onSubmit={(event) => {
+        event.preventDefault()
+        setError('')
+        setNotice('')
+        updateEmail.mutate(email)
+      }}
+    >
+      <p>{t('accountEmailBody')}</p>
+      <label>
+        <span>{t('currentEmail')}</span>
+        <input value={auth.profile?.email ?? ''} readOnly aria-label={t('currentEmail')} />
+      </label>
+      <label>
+        <span>{t('newEmail')}</span>
+        <input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          autoComplete="email"
+          required
+          aria-label={t('newEmail')}
+        />
+      </label>
+      <p className="account-email-hint">{t('accountEmailOldRemains')}</p>
+      {notice && (
+        <p className="form-success" role="status">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <Button className="drawer-save" type="submit" disabled={updateEmail.isPending}>
+        {updateEmail.isPending ? t('accountEmailSending') : t('accountEmailSend')}
+      </Button>
+    </form>
+  )
+
+  if (embedded) return content
+
   return (
     <AppDrawer open={open} onOpenChange={onOpenChange} title={t('account')}>
-      <form
-        className="drawer-form account-form"
-        onSubmit={(event) => {
-          event.preventDefault()
-          setError('')
-          setNotice('')
-          updateEmail.mutate(email)
-        }}
-      >
-        <p>{t('accountEmailBody')}</p>
-        <label>
-          <span>{t('currentEmail')}</span>
-          <input value={auth.profile?.email ?? ''} readOnly aria-label={t('currentEmail')} />
-        </label>
-        <label>
-          <span>{t('newEmail')}</span>
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            required
-            aria-label={t('newEmail')}
-          />
-        </label>
-        <p className="account-email-hint">{t('accountEmailOldRemains')}</p>
-        {notice && (
-          <p className="form-success" role="status">
-            {notice}
-          </p>
-        )}
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        )}
-        <Button className="drawer-save" type="submit" disabled={updateEmail.isPending}>
-          {updateEmail.isPending ? t('accountEmailSending') : t('accountEmailSend')}
-        </Button>
-      </form>
+      {content}
     </AppDrawer>
   )
 }

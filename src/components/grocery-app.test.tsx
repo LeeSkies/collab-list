@@ -110,7 +110,7 @@ afterEach(async () => {
 })
 
 describe('GroceryApp account access', () => {
-  it('opens the account drawer for regular members', async () => {
+  it('opens the account drawer for regular members through settings', async () => {
     const user = userEvent.setup()
     vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
     vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
@@ -124,9 +124,71 @@ describe('GroceryApp account access', () => {
       </QueryClientProvider>
     )
 
-    await user.click(await screen.findByRole('button', { name: 'Account' }))
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Account' }))
     expect(screen.getByRole('heading', { name: 'Account' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Send confirmation email' })).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send confirmation email' })).toBeVisible()
+    )
+  })
+})
+
+describe('GroceryApp settings header', () => {
+  it('replaces the four-action header with a single settings gear', async () => {
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Settings' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Language' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the pending-request badge on the settings admin row', async () => {
+    const user = userEvent.setup()
+    authState.profile = {
+      role: 'admin',
+      household_id: boughtProduct.household_id,
+      product_tour_completed_at: '2026-08-05T12:00:00.000Z'
+    }
+    vi.spyOn(api.products, 'list').mockResolvedValue([boughtProduct])
+    vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
+    vi.spyOn(api.household, 'pendingRequests').mockResolvedValue([
+      {
+        requestId: 'req-1',
+        name: 'Dana',
+        email: 'dana@example.com',
+        requestedAt: '2026-08-01T00:00:00Z',
+        expiresAt: '2026-08-08T00:00:00Z'
+      }
+    ])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <GroceryApp />
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    const adminRow = screen.getByRole('button', { name: /Users/ })
+    expect(within(adminRow).getByText('1')).toBeVisible()
+    await user.click(adminRow)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generate invite link' })).toBeVisible()
+    )
   })
 })
 
