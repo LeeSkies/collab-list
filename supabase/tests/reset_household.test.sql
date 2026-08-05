@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(28);
+select plan(30);
 
 set local role postgres;
 create temp table reset_context as
@@ -86,6 +86,11 @@ select is(
   'clear-products reset deletes all products'
 );
 select is(
+  (select count(*) from public.categories where household_id = (select household_id from reset_context)),
+  10::bigint,
+  'clear-products reset preserves the seeded categories'
+);
+select is(
   (select count(*) from public.household_members where household_id = (select household_id from reset_context)),
   2::bigint,
   'clear-products reset preserves all memberships'
@@ -137,6 +142,11 @@ select * from public.create_product('Reset both-options product');
 create temp table both_result as select * from public.reset_household(true, true);
 select is((select products_deleted from both_result), 2::bigint, 'both-options reset deletes all remaining products');
 select is((select count(*) from public.products where household_id = (select household_id from reset_context)), 0::bigint, 'both-options reset leaves no products or product history rows');
+select is(
+  (select count(*) from public.categories where household_id = (select household_id from reset_context)),
+  10::bigint,
+  'both-options reset preserves the seeded categories'
+);
 select is((select members_removed from both_result), 1::bigint, 'both-options reset removes the non-admin member');
 select is((select count(*) from public.household_members where household_id = (select household_id from reset_context) and role = 'admin'), 1::bigint, 'both-options reset preserves the admin membership');
 select is((select count(*) from public.households where id = (select household_id from reset_context)), 1::bigint, 'both-options reset preserves the household');

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(63);
+select plan(69);
 set local role postgres;
 
 select has_table('public', 'deleted_households', 'deleted household recovery metadata exists');
@@ -147,6 +147,12 @@ select is(
   'soft deletion purges pending access requests'
 );
 select is(
+  (select count(*) from public.categories
+   where household_id = (select household_id from public.deleted_households limit 1)),
+  10::bigint,
+  'soft deletion preserves the household categories'
+);
+select is(
   (select count(*) from public.household_member_intervals
    where household_id = (select household_id from public.deleted_households limit 1)
      and user_id = '10000000-0000-0000-0000-000000000001'::uuid
@@ -234,6 +240,12 @@ select is(
   1::bigint,
   'recovery reopens exactly one former admin membership interval'
 );
+select is(
+  (select count(*) from public.categories
+   where household_id = (select household_id from public.household_members where user_id = auth.uid())),
+  10::bigint,
+  'recovery keeps the household categories intact'
+);
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
 select lives_ok($$ select public.delete_household(false) $$, 'a recovered admin can request deletion again');
@@ -253,6 +265,8 @@ select is(
   true,
   'immediate purge is exercised with entitlement enforcement enabled'
 );
+create temp table purge_context as
+select household_id from public.household_members where user_id = '10000000-0000-0000-0000-000000000001'::uuid;
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
 select lives_ok(
@@ -294,6 +308,11 @@ select is(
      and reason = 'immediate_purge'),
   'pending',
   'immediate purge leaves a durable pending cancellation intent'
+);
+select is(
+  (select count(*) from public.categories where household_id = (select household_id from purge_context)),
+  0::bigint,
+  'immediate purge cascades the household categories'
 );
 select lives_ok(
   $$ select public.sync_subscription_from_provider(
@@ -343,11 +362,28 @@ from public.households where name = 'Expiry test household';
 insert into public.household_members(household_id, user_id, role)
 select id, '10000000-0000-0000-0000-000000000001', 'admin'
 from public.households where name = 'Expiry test household';
+select lives_ok(
+  $$ insert into public.categories(household_id, name)
+     select id, 'expiry-category' from public.households where name = 'Expiry test household' $$,
+  'an expiry candidate household can carry a custom category'
+);
+select is(
+  (select count(*) from public.categories
+   where household_id = (select id from public.households where name = 'Expiry test household')),
+  1::bigint,
+  'the expiry fixture category is present before purge'
+);
 select lives_ok($$ select public.delete_household(false) $$, 'an expiry candidate can be soft-deleted');
 update public.deleted_households
 set deleted_at = now() - interval '2 seconds', purge_at = now() - interval '1 second';
 select is(public.purge_expired_deleted_households(), 1, 'the service primitive purges expired households');
 select is((select count(*) from public.households where name = 'Expiry test household'), 0::bigint, 'expiry purge cascades household data');
+select is(
+  (select count(*) from public.categories
+   where household_id = (select id from public.households where name = 'Expiry test household')),
+  0::bigint,
+  'expiry purge cascades the household categories'
+);
 select is(
   (select provider || ':' || provider_subscription_id
    from public.household_cancellation_outbox

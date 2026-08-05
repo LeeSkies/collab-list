@@ -4,6 +4,7 @@ import type {
   AdminUser,
   BillingActionResult,
   BillingActionType,
+  Category,
   DeletedHousehold,
   HouseholdCreation,
   HouseholdEntitlement,
@@ -201,7 +202,7 @@ export const api = {
           p_name: changes.name,
           p_quantity: changes.quantity,
           p_notes: changes.notes,
-          p_category: changes.category,
+          p_category_id: changes.category_id,
           p_expected_version: product.version
         })
       )
@@ -215,6 +216,13 @@ export const api = {
         })
       )
     }
+  },
+  categories: {
+    list: (signal?: AbortSignal) =>
+      unwrap<Category[]>(
+        supabase.from('categories').select('*').order('name', { ascending: true }),
+        signal
+      )
   },
   profile: {
     current: (id: string) =>

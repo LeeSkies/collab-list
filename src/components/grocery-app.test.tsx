@@ -2,11 +2,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { api, ApiError } from '../lib/api'
-import { PRODUCT_CATEGORIES } from '../lib/product-category'
-import type { Product } from '../lib/types'
+import { SEED_CATEGORY_NAMES } from '../lib/product-category'
+import type { Category, Product } from '../lib/types'
 import { GroceryApp } from './grocery-app'
 import { ProductSection } from './product-section'
 
@@ -26,6 +26,28 @@ vi.mock('../auth', () => ({
   useAuth: () => authState
 }))
 
+// The API returns the household's categories sorted by name.
+const categories: Category[] = [
+  'bakery',
+  'dairy_eggs',
+  'drinks',
+  'frozen',
+  'fruit_vegetables',
+  'household',
+  'meat_fish',
+  'other',
+  'pantry',
+  'snacks'
+].map((name) => ({
+  id: `cat-${name}`,
+  household_id: '20000000-0000-0000-0000-000000000001',
+  name
+}))
+
+beforeEach(() => {
+  vi.spyOn(api.categories, 'list').mockResolvedValue(categories)
+})
+
 const boughtProduct: Product = {
   household_id: '20000000-0000-0000-0000-000000000001',
   id: '10000000-0000-0000-0000-000000000003',
@@ -33,7 +55,7 @@ const boughtProduct: Product = {
   name_signature: '4:milk',
   quantity: '1.00',
   notes: null,
-  category: 'other',
+  category_id: 'cat-other',
   is_picked: true,
   picked_at: '2026-07-13T12:00:00.000Z',
   ordering_at: '2026-07-13T12:00:00.000Z',
@@ -157,10 +179,10 @@ describe('GroceryApp sorting', () => {
     await i18n.changeLanguage('en')
     localStorage.setItem('grocery-sort-mode', 'category')
     const products: Product[] = [
-      { ...newProduct, id: 'snacks-zebra', name: 'Zebra', category: 'snacks' },
-      { ...newProduct, id: 'dairy-milk', name: 'Milk', category: 'dairy_eggs' },
-      { ...newProduct, id: 'snacks-apple', name: 'apple', category: 'snacks' },
-      { ...boughtProduct, id: 'bakery-bread', name: 'Bread', category: 'bakery' }
+      { ...newProduct, id: 'snacks-zebra', name: 'Zebra', category_id: 'cat-snacks' },
+      { ...newProduct, id: 'dairy-milk', name: 'Milk', category_id: 'cat-dairy_eggs' },
+      { ...newProduct, id: 'snacks-apple', name: 'apple', category_id: 'cat-snacks' },
+      { ...boughtProduct, id: 'bakery-bread', name: 'Bread', category_id: 'cat-bakery' }
     ]
     vi.spyOn(api.products, 'list').mockResolvedValue(products)
     vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
@@ -192,9 +214,9 @@ describe('GroceryApp sorting', () => {
     await i18n.changeLanguage('en')
     localStorage.setItem('grocery-sort-mode', 'category')
     const products: Product[] = [
-      { ...newProduct, id: 'prefix', name: 'Milk chocolate', category: 'snacks' },
-      { ...newProduct, id: 'contains', name: 'Buttermilk', category: 'dairy_eggs' },
-      { ...newProduct, id: 'fuzzy', name: 'Mlik', category: 'bakery' }
+      { ...newProduct, id: 'prefix', name: 'Milk chocolate', category_id: 'cat-snacks' },
+      { ...newProduct, id: 'contains', name: 'Buttermilk', category_id: 'cat-dairy_eggs' },
+      { ...newProduct, id: 'fuzzy', name: 'Mlik', category_id: 'cat-bakery' }
     ]
     vi.spyOn(api.products, 'list').mockResolvedValue(products)
     vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
@@ -223,14 +245,14 @@ describe('GroceryApp sorting', () => {
       within(toBuy)
         .getAllByRole('button', { name: /^Edit / })
         .map((button) => button.getAttribute('aria-label'))
-    ).toEqual(['Edit Buttermilk', 'Edit Mlik', 'Edit Milk chocolate'])
+    ).toEqual(['Edit Mlik', 'Edit Buttermilk', 'Edit Milk chocolate'])
   })
 
   it('localizes category sorting for Hebrew RTL', async () => {
     await i18n.changeLanguage('he')
     localStorage.setItem('grocery-sort-mode', 'category')
     vi.spyOn(api.products, 'list').mockResolvedValue([
-      { ...newProduct, id: 'hebrew-snack', name: 'חטיף', category: 'snacks' }
+      { ...newProduct, id: 'hebrew-snack', name: 'חטיף', category_id: 'cat-snacks' }
     ])
     vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -254,10 +276,10 @@ describe('GroceryApp category filtering', () => {
     const user = userEvent.setup()
     await i18n.changeLanguage('en')
     const products: Product[] = [
-      { ...newProduct, id: 'snack-to-buy', name: 'Pretzels', category: 'snacks' },
-      { ...newProduct, id: 'dairy-to-buy', name: 'Yogurt', category: 'dairy_eggs' },
-      { ...boughtProduct, id: 'snack-bought', name: 'Chips', category: 'snacks' },
-      { ...boughtProduct, id: 'bakery-bought', name: 'Rolls', category: 'bakery' }
+      { ...newProduct, id: 'snack-to-buy', name: 'Pretzels', category_id: 'cat-snacks' },
+      { ...newProduct, id: 'dairy-to-buy', name: 'Yogurt', category_id: 'cat-dairy_eggs' },
+      { ...boughtProduct, id: 'snack-bought', name: 'Chips', category_id: 'cat-snacks' },
+      { ...boughtProduct, id: 'bakery-bought', name: 'Rolls', category_id: 'cat-bakery' }
     ]
     vi.spyOn(api.products, 'list').mockResolvedValue(products)
     vi.spyOn(api.realtime, 'subscribe').mockReturnValue({ unsubscribe: vi.fn() } as never)
@@ -282,7 +304,7 @@ describe('GroceryApp category filtering', () => {
     expect(screen.queryByRole('button', { name: 'Show all' })).not.toBeInTheDocument()
 
     const allCategories = screen.getByRole('button', { name: 'All categories' })
-    let categoryButtons = PRODUCT_CATEGORIES.map((category) =>
+    let categoryButtons = SEED_CATEGORY_NAMES.map((category) =>
       screen.getByRole('button', { name: i18n.t(`category_${category}`) })
     )
     expect(allCategories).toHaveAttribute('aria-pressed', 'false')
@@ -308,7 +330,7 @@ describe('GroceryApp category filtering', () => {
         .getAllByRole('button')
         .slice(0, 3)
         .map((button) => button.textContent)
-    ).toEqual(['All categories', 'Snacks', 'Fruit & vegetables'])
+    ).toEqual(['All categories', 'Snacks', 'Bakery'])
 
     await user.click(screen.getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -325,7 +347,7 @@ describe('GroceryApp category filtering', () => {
 
     await user.click(screen.getByRole('button', { name: 'Filter categories' }))
     await user.click(screen.getByRole('button', { name: 'All categories' }))
-    categoryButtons = PRODUCT_CATEGORIES.map((category) =>
+    categoryButtons = SEED_CATEGORY_NAMES.map((category) =>
       screen.getByRole('button', { name: i18n.t(`category_${category}`) })
     )
     categoryButtons.forEach((button) => expect(button).toHaveAttribute('aria-pressed', 'true'))
@@ -406,7 +428,7 @@ describe('GroceryApp realtime categories', () => {
 
   it('reconciles an open drawer with an authoritative category refetch', async () => {
     const user = userEvent.setup()
-    const refreshedProduct = { ...boughtProduct, category: 'pantry' as const, version: 2 }
+    const refreshedProduct = { ...boughtProduct, category_id: 'cat-pantry' as const, version: 2 }
     vi.spyOn(api.products, 'list')
       .mockResolvedValueOnce([boughtProduct])
       .mockResolvedValue([refreshedProduct])
@@ -438,19 +460,19 @@ describe('GroceryApp realtime categories', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: 'Edit Milk' }))
-    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveValue('other')
+    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveValue('cat-other')
 
     onProductChange()
 
     const category = screen.getByRole('combobox', { name: 'Category' })
-    await waitFor(() => expect(category).toHaveValue('pantry'))
+    await waitFor(() => expect(category).toHaveValue('cat-pantry'))
 
-    await user.selectOptions(category, 'snacks')
+    await user.selectOptions(category, 'cat-snacks')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Someone changed this product')
     expect(update.mock.calls[0]?.[0].version).toBe(1)
-    expect(category).toHaveValue('snacks')
+    expect(category).toHaveValue('cat-snacks')
   })
 })
 
@@ -527,7 +549,7 @@ describe('GroceryApp CRUD reconciliation', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Edit Bread' }))
     const category = await screen.findByRole('combobox', { name: 'Category' })
-    await user.selectOptions(category, 'snacks')
+    await user.selectOptions(category, 'cat-snacks')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     expect(update).toHaveBeenCalled()
 

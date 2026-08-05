@@ -4,7 +4,7 @@ import dayjs from 'dayjs'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, isApiErrorCode, isProductConflict } from '../lib/api'
-import { PRODUCT_CATEGORIES } from '../lib/product-category'
+import { categoryLabel } from '../lib/product-category'
 import {
   duplicateSignature,
   normalizeNameForStorage,
@@ -12,7 +12,7 @@ import {
   PRODUCT_NOTES_MAX,
   validateQuantity
 } from '../lib/product'
-import type { Product, ProductChanges } from '../lib/types'
+import type { Category, Product, ProductChanges } from '../lib/types'
 import { AppDrawer, ConfirmDialog } from './drawer'
 import { HoldToRevealName } from './hold-to-reveal-name'
 import { Button } from './ui/button'
@@ -27,6 +27,7 @@ export function ProductDrawer({
   onDelete,
   onToggle,
   pending,
+  categories,
   canMutate = true,
   boundaryIsPaid = false,
   paidBoundaryNeedsAttention = false
@@ -40,6 +41,7 @@ export function ProductDrawer({
   onDelete(product: Product): Promise<void>
   onToggle(product: Product): void
   pending: boolean
+  categories: Category[]
   canMutate?: boolean
   boundaryIsPaid?: boolean
   paidBoundaryNeedsAttention?: boolean
@@ -52,7 +54,7 @@ export function ProductDrawer({
   }
   const [values, setValues] = useState(productValues)
   const [initial, setInitial] = useState(values)
-  const [categoryEdit, setCategoryEdit] = useState<Product['category'] | null>(null)
+  const [categoryEdit, setCategoryEdit] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
@@ -63,9 +65,10 @@ export function ProductDrawer({
   })
   const formId = `product-form-${product.id}`
 
-  const category = categoryEdit ?? authoritativeProduct.category
+  const category = categoryEdit ?? authoritativeProduct.category_id
   const dirty =
-    JSON.stringify(values) !== JSON.stringify(initial) || category !== authoritativeProduct.category
+    JSON.stringify(values) !== JSON.stringify(initial) ||
+    category !== authoritativeProduct.category_id
   const validation = useMemo(() => {
     const name = normalizeNameForStorage(values.name)
     if ([...name].length < 1 || [...name].length > PRODUCT_NAME_MAX) return t('invalidName')
@@ -89,7 +92,7 @@ export function ProductDrawer({
         name: normalizeNameForStorage(values.name),
         quantity: values.quantity,
         notes: values.notes.trim(),
-        category
+        category_id: category
       })
       setInitial(values)
       setCategoryEdit(null)
@@ -187,15 +190,11 @@ export function ProductDrawer({
             <select
               value={category}
               disabled={pending || !canMutate}
-              onChange={(event) =>
-                setCategoryEdit(
-                  PRODUCT_CATEGORIES.find((category) => category === event.target.value) ?? 'other'
-                )
-              }
+              onChange={(event) => setCategoryEdit(event.target.value)}
             >
-              {PRODUCT_CATEGORIES.map((category) => (
-                <option key={category} value={category}>
-                  {t(`category_${category}`)}
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {categoryLabel(t, category.name)}
                 </option>
               ))}
             </select>

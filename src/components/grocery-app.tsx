@@ -22,7 +22,6 @@ import { useAuth } from '../auth'
 import { api } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { normalizeText, type ProductSortMode } from '../lib/product'
-import type { ProductCategory } from '../lib/product-category'
 import type { Product } from '../lib/types'
 import { useGroceryList } from '../hooks/use-grocery-list'
 import { Button } from './ui/button'
@@ -50,7 +49,7 @@ export function GroceryApp() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [categoryFilterOpen, setCategoryFilterOpen] = useState(false)
-  const [categoryFilters, setCategoryFilters] = useState<ReadonlySet<ProductCategory>>(new Set())
+  const [categoryFilters, setCategoryFilters] = useState<ReadonlySet<string>>(new Set())
   const [restoreAllOpen, setRestoreAllOpen] = useState(false)
   const [duplicatePulse, setDuplicatePulse] = useState('')
   const [enteringProductIds, setEnteringProductIds] = useState<ReadonlySet<string>>(new Set())
@@ -205,6 +204,7 @@ export function GroceryApp() {
 
   const {
     products,
+    categories,
     list,
     unpicked,
     picked,
@@ -324,6 +324,7 @@ export function GroceryApp() {
                 title={t('unpicked')}
                 products={unpicked}
                 groupByCategory={sortMode === 'category' && !normalizeText(search)}
+                categories={categories}
                 animateChanges={!categoryFilterOpen}
                 headerAction={
                   <div className="list-header-actions">
@@ -359,6 +360,7 @@ export function GroceryApp() {
                 title={t('picked')}
                 products={picked}
                 groupByCategory={sortMode === 'category' && !normalizeText(search)}
+                categories={categories}
                 animateChanges={!categoryFilterOpen}
                 showCount={false}
                 headerAction={
@@ -403,6 +405,7 @@ export function GroceryApp() {
           product={selected}
           authoritativeProduct={selectedProduct}
           products={list}
+          categories={categories}
           open={Boolean(selectedProduct)}
           onOpenChange={(open) => !open && setSelected(null)}
           pending={mutationState.bulk || mutationState.productIds.has(selectedProduct.id)}
@@ -421,6 +424,7 @@ export function GroceryApp() {
       <CategoryFilterDrawer
         open={categoryFilterOpen}
         onOpenChange={setCategoryFilterOpen}
+        categories={categories}
         selectedCategories={categoryFilters}
         onChange={setCategoryFilters}
       />

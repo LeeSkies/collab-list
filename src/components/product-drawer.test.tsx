@@ -5,8 +5,29 @@ import { I18nextProvider } from 'react-i18next'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import { api, ApiError } from '../lib/api'
-import type { Product } from '../lib/types'
+import type { Category, Product } from '../lib/types'
 import { ProductDrawer } from './product-drawer'
+
+const categories: Category[] = [
+  {
+    id: 'cat-fruit_vegetables',
+    household_id: '20000000-0000-0000-0000-000000000001',
+    name: 'fruit_vegetables'
+  },
+  {
+    id: 'cat-dairy_eggs',
+    household_id: '20000000-0000-0000-0000-000000000001',
+    name: 'dairy_eggs'
+  },
+  { id: 'cat-meat_fish', household_id: '20000000-0000-0000-0000-000000000001', name: 'meat_fish' },
+  { id: 'cat-bakery', household_id: '20000000-0000-0000-0000-000000000001', name: 'bakery' },
+  { id: 'cat-pantry', household_id: '20000000-0000-0000-0000-000000000001', name: 'pantry' },
+  { id: 'cat-frozen', household_id: '20000000-0000-0000-0000-000000000001', name: 'frozen' },
+  { id: 'cat-drinks', household_id: '20000000-0000-0000-0000-000000000001', name: 'drinks' },
+  { id: 'cat-snacks', household_id: '20000000-0000-0000-0000-000000000001', name: 'snacks' },
+  { id: 'cat-household', household_id: '20000000-0000-0000-0000-000000000001', name: 'household' },
+  { id: 'cat-other', household_id: '20000000-0000-0000-0000-000000000001', name: 'other' }
+]
 
 const product: Product = {
   household_id: '20000000-0000-0000-0000-000000000001',
@@ -15,7 +36,7 @@ const product: Product = {
   name_signature: '4:milk',
   quantity: '2.00',
   notes: 'Buy the blue carton',
-  category: 'dairy_eggs',
+  category_id: 'cat-dairy_eggs',
   is_picked: false,
   picked_at: null,
   ordering_at: '2026-07-13T12:00:00.000Z',
@@ -46,6 +67,7 @@ function renderDrawer(
         <ProductDrawer
           product={product}
           products={[product]}
+          categories={categories}
           open
           onOpenChange={vi.fn()}
           onSave={onSave}
@@ -64,11 +86,11 @@ describe('ProductDrawer', () => {
     await i18n.changeLanguage('en')
   })
 
-  it('offers the fixed category taxonomy through an accessible select', () => {
+  it('offers the household categories through an accessible select', () => {
     renderDrawer()
 
     const category = screen.getByRole('combobox', { name: 'Category' })
-    expect(category).toHaveValue('dairy_eggs')
+    expect(category).toHaveValue('cat-dairy_eggs')
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
       'Fruit & vegetables',
       'Dairy & eggs',
@@ -83,19 +105,19 @@ describe('ProductDrawer', () => {
     ])
   })
 
-  it('saves a changed category as its stable key', async () => {
+  it('saves a changed category as its household category reference', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn().mockResolvedValue(undefined)
     renderDrawer(onSave)
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Category' }), 'pantry')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Category' }), 'cat-pantry')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     expect(onSave).toHaveBeenCalledWith(product, {
       name: 'Milk',
       quantity: '2.00',
       notes: 'Buy the blue carton',
-      category: 'pantry'
+      category_id: 'cat-pantry'
     })
   })
 
@@ -104,8 +126,19 @@ describe('ProductDrawer', () => {
     renderDrawer()
 
     const category = screen.getByRole('combobox', { name: 'קטגוריה' })
-    expect(category).toHaveValue('dairy_eggs')
-    expect(screen.getByRole('option', { name: 'מוצרי חלב וביצים' })).toHaveValue('dairy_eggs')
+    expect(category).toHaveValue('cat-dairy_eggs')
+    expect(screen.getByRole('option', { name: 'מוצרי חלב וביצים' })).toHaveValue('cat-dairy_eggs')
+  })
+
+  it('falls back to the stored name for custom categories', () => {
+    renderDrawer(vi.fn().mockResolvedValue(undefined), {
+      categories: [
+        ...categories,
+        { id: 'cat-cheese', household_id: '20000000-0000-0000-0000-000000000001', name: 'Cheese' }
+      ]
+    })
+
+    expect(screen.getByRole('option', { name: 'Cheese' })).toHaveValue('cat-cheese')
   })
 
   it('clears notes and enables saving the change', async () => {
@@ -128,7 +161,7 @@ describe('ProductDrawer', () => {
       name: 'Milk',
       quantity: '2.00',
       notes: '',
-      category: 'dairy_eggs'
+      category_id: 'cat-dairy_eggs'
     })
   })
 
