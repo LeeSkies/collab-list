@@ -5,6 +5,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AuthProvider } from './auth'
 import { ErrorBoundary } from './components/error-boundary'
+import './index.css'
 import './i18n'
 import { routeTree } from './routeTree.gen'
 
