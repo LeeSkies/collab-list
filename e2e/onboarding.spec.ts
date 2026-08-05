@@ -120,6 +120,7 @@ test('an invitee can request access and be approved by the household admin', asy
   await expect(
     page.getByRole('textbox', { name: /find or add a product|חיפוש או הוספת מוצר/i })
   ).toBeVisible()
+  await page.getByRole('button', { name: /settings|הגדרות/i }).click()
   await page.getByRole('button', { name: /users|משתמשים/i }).click()
   await page
     .getByRole('button', { name: /generate invite|rotate invite|יצירת קישור הזמנה/i })

@@ -86,15 +86,16 @@ export function useGroceryList({
     gcTime: 0
   })
 
-  // Household categories are immutable in this phase: seed them once and keep
-  // them cached so grouping, filtering, and drawer options never flicker.
+  // Categories are mutable now: keep a short stale window so a re-entered
+  // screen converges, while mutations and realtime events invalidate it
+  // explicitly. The household-cleanup effect below still drops the cache on
+  // household change or sign-out.
   const categories = useQuery({
     queryKey: categoriesQueryKey,
     queryFn: ({ signal }) => api.categories.list(signal),
     enabled: Boolean(householdId),
     retry: 1,
-    staleTime: Infinity,
-    gcTime: Infinity
+    staleTime: 30_000
   })
 
   // Query lifecycle: drop product caches when the household changes or leaves.
@@ -113,16 +114,23 @@ export function useGroceryList({
     }
   }, [client, householdId])
 
-  // Realtime reconciliation: product changes flow through a trailing
-  // server-authoritative refetch so echoes cannot double-apply optimistically.
+  // Realtime reconciliation: product and category changes flow through a
+  // trailing server-authoritative refetch so echoes cannot double-apply
+  // optimistically and other devices converge on category edits.
   useEffect(() => {
     if (!householdId) return
     const refresher = new TrailingRefresh(
       () =>
-        client.refetchQueries(
-          { queryKey: productsQueryKey, type: 'active' },
-          { throwOnError: true }
-        ),
+        Promise.all([
+          client.refetchQueries(
+            { queryKey: productsQueryKey, type: 'active' },
+            { throwOnError: true }
+          ),
+          client.refetchQueries(
+            { queryKey: categoriesQueryKey, type: 'active' },
+            { throwOnError: true }
+          )
+        ]),
       100
     )
     const channel = api.realtime.subscribe(
@@ -143,7 +151,7 @@ export function useGroceryList({
       refresher.dispose()
       void channel.unsubscribe()
     }
-  }, [client, householdId, productsQueryKey])
+  }, [client, householdId, productsQueryKey, categoriesQueryKey])
 
   // Reconnect: bring the product list and the screen-owned entitlement state
   // back in sync when the connection returns.
@@ -153,6 +161,7 @@ export function useGroceryList({
       onToast(t('connected'))
       if (householdId) {
         void client.refetchQueries({ queryKey: productsQueryKey, type: 'active' })
+        void client.refetchQueries({ queryKey: categoriesQueryKey, type: 'active' })
         onRefreshEntitlement()
       }
     }
@@ -163,7 +172,7 @@ export function useGroceryList({
       removeEventListener('online', handleOnline)
       removeEventListener('offline', handleOffline)
     }
-  }, [client, householdId, onRefreshEntitlement, onToast, productsQueryKey, t])
+  }, [client, householdId, onRefreshEntitlement, onToast, productsQueryKey, categoriesQueryKey, t])
 
   const connectionWarningEligible =
     !products.isLoading && !products.isError && (!online || realtime === 'disconnected')

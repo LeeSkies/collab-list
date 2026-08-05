@@ -4,12 +4,9 @@ import {
   ArrowsDownUp,
   Check,
   Funnel,
-  Globe,
+  Gear,
   MagnifyingGlass,
   Plus,
-  SignOut,
-  UserCircle,
-  UsersThree,
   WifiSlash,
   X
 } from '@phosphor-icons/react'
@@ -25,13 +22,12 @@ import { normalizeText, type ProductSortMode } from '../lib/product'
 import type { Product } from '../lib/types'
 import { useGroceryList } from '../hooks/use-grocery-list'
 import { Button } from './ui/button'
-import { AccountDrawer } from './account-drawer'
-import { AdminDrawer } from './admin-drawer'
 import { CategoryFilterDrawer } from './category-filter-drawer'
 import { ProductDrawer } from './product-drawer'
 import { ProductSection } from './product-section'
 import { ProductTour } from './product-tour'
 import { RestoreAllDialog } from './restore-all-dialog'
+import { SettingsDrawer } from './settings-drawer'
 
 const SORT_MODES: ProductSortMode[] = ['default', 'name', 'category']
 const SORT_STORAGE_KEY = 'grocery-sort-mode'
@@ -46,8 +42,7 @@ export function GroceryApp() {
     return SORT_MODES.find((mode) => mode === stored) ?? 'default'
   })
   const [selected, setSelected] = useState<Product | null>(null)
-  const [adminOpen, setAdminOpen] = useState(false)
-  const [accountOpen, setAccountOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [categoryFilterOpen, setCategoryFilterOpen] = useState(false)
   const [categoryFilters, setCategoryFilters] = useState<ReadonlySet<string>>(new Set())
   const [restoreAllOpen, setRestoreAllOpen] = useState(false)
@@ -61,7 +56,6 @@ export function GroceryApp() {
   const searchRef = useRef<HTMLInputElement>(null)
   const householdId = auth.profile?.household_id
   const locale = i18n.resolvedLanguage ?? i18n.language
-
   const entitlement = useQuery({
     queryKey: ['household-entitlement', householdId],
     queryFn: api.household.entitlement,
@@ -149,8 +143,7 @@ export function GroceryApp() {
     const previous = previousHouseholdId.current
     if (previous !== householdId) {
       setSelected(null)
-      setAdminOpen(false)
-      setAccountOpen(false)
+      setSettingsOpen(false)
       setCategoryFilterOpen(false)
       setRestoreAllOpen(false)
       setCategoryFilters(new Set())
@@ -227,13 +220,22 @@ export function GroceryApp() {
       ? (list.find((product) => product.id === selected.id) ?? selected)
       : null
 
+  // Prune filter ids for categories deleted here or on other devices. Derived
+  // during render (the adjust-state-when-props-change pattern) so the filtered
+  // view never references a category that no longer exists.
+  const [categorySnapshot, setCategorySnapshot] = useState(categories)
+  if (categorySnapshot !== categories) {
+    setCategorySnapshot(categories)
+    setCategoryFilters((current) => {
+      const knownIds = new Set(categories.map((category) => category.id))
+      const pruned = new Set([...current].filter((id) => knownIds.has(id)))
+      return pruned.size === current.size ? current : pruned
+    })
+  }
+
   return (
     <main className="app-shell">
-      <AppHeader
-        onAccount={() => setAccountOpen(true)}
-        onAdmin={() => setAdminOpen(true)}
-        pendingRequestCount={pendingRequests.data?.length ?? 0}
-      />
+      <AppHeader onSettings={() => setSettingsOpen(true)} />
       {showBoundaryBanner && (
         <div className="entitlement-banner" role="status">
           {entitlement.data?.access_state === 'read_only_grace'
@@ -417,10 +419,12 @@ export function GroceryApp() {
           paidBoundaryNeedsAttention={paidBoundaryNeedsAttention}
         />
       )}
-      <AccountDrawer open={accountOpen} onOpenChange={setAccountOpen} />
-      {auth.profile?.role === 'admin' && (
-        <AdminDrawer open={adminOpen} onOpenChange={setAdminOpen} canMutate={canMutate} />
-      )}
+      <SettingsDrawer
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        canMutate={canMutate}
+        pendingRequestCount={pendingRequests.data?.length ?? 0}
+      />
       <CategoryFilterDrawer
         open={categoryFilterOpen}
         onOpenChange={setCategoryFilterOpen}
@@ -509,17 +513,8 @@ function AppToast({ message }: { message: string }) {
   )
 }
 
-function AppHeader({
-  onAccount,
-  onAdmin,
-  pendingRequestCount
-}: {
-  onAccount(): void
-  onAdmin(): void
-  pendingRequestCount: number
-}) {
-  const { t, i18n } = useTranslation()
-  const auth = useAuth()
+function AppHeader({ onSettings }: { onSettings(): void }) {
+  const { t } = useTranslation()
   return (
     <header className="app-header">
       <div>
@@ -527,40 +522,13 @@ function AppHeader({
         <h1>{t('appName')}</h1>
       </div>
       <nav>
-        <button type="button" className="icon-button" onClick={onAccount} aria-label={t('account')}>
-          <UserCircle />
-        </button>
-        {auth.profile?.role === 'admin' && (
-          <button
-            type="button"
-            className="icon-button admin-menu-button"
-            onClick={onAdmin}
-            aria-label={t('admin')}
-          >
-            <UsersThree />
-            {pendingRequestCount > 0 && (
-              <span className="admin-pending-badge" aria-label={`${pendingRequestCount}`}>
-                {pendingRequestCount}
-              </span>
-            )}
-          </button>
-        )}
         <button
           type="button"
-          className="language-button"
-          onClick={() => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}
-          aria-label={t('language')}
+          className="icon-button settings-button"
+          onClick={onSettings}
+          aria-label={t('settings')}
         >
-          <Globe />
-          {i18n.language === 'he' ? 'EN' : 'עב'}
-        </button>
-        <button
-          type="button"
-          className="icon-button"
-          onClick={() => void auth.signOut()}
-          aria-label={t('logout')}
-        >
-          <SignOut />
+          <Gear />
         </button>
       </nav>
     </header>

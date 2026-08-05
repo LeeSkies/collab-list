@@ -789,6 +789,20 @@ export type Database = {
           product_tour_completed_at: string
         }[]
       }
+      create_category: {
+        Args: { p_name: string }
+        Returns: {
+          household_id: string
+          id: string
+          name: string
+        }[]
+        SetofOptions: {
+          from: '*'
+          to: 'categories'
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       create_household_with_trial: {
         Args: never
         Returns: {
@@ -862,23 +876,24 @@ export type Database = {
         Returns: {
           active_member_count: number
           add_on_seat_count: number
-          add_on_unit_amount_minor_units: number | null
+          add_on_unit_amount_minor_units: number
           base_seat_allowance: number
           billed_seat_count: number
           billing_enabled: boolean
           cancel_at_period_end: boolean
-          canceled_at: string | null
-          currency: string | null
-          current_period_end: string | null
-          current_period_start: string | null
-          grace_ends_at: string | null
+          canceled_at: string
+          currency: string
+          current_period_end: string
+          current_period_start: string
+          grace_ends_at: string
           household_id: string
-          provider: string | null
-          provider_event_id: string | null
-          provider_subscription_id: string | null
+          provider: string
+          provider_event_id: string
+          provider_subscription_id: string
           status: string
         }[]
       }
+      delete_category: { Args: { p_category_id: string }; Returns: boolean }
       delete_household: { Args: { p_purge_now?: boolean }; Returns: boolean }
       delete_product: {
         Args: { p_expected_version: number; p_product_id: string }
