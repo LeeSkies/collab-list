@@ -136,8 +136,8 @@ describe('products.update', () => {
     rpc.mockReset()
   })
 
-  it('sends the category key through the versioned update RPC', async () => {
-    rpc.mockResolvedValue({ data: [{ category: 'pantry' }], error: null })
+  it('sends the category id through the versioned update RPC', async () => {
+    rpc.mockResolvedValue({ data: [{ category_id: 'cat-pantry' }], error: null })
 
     const result = await api.products.update(
       {
@@ -147,7 +147,7 @@ describe('products.update', () => {
         name_signature: '4:milk',
         quantity: '2.00',
         notes: null,
-        category: 'other',
+        category_id: 'cat-other',
         is_picked: false,
         picked_at: null,
         ordering_at: '2026-07-13T12:00:00.000Z',
@@ -157,7 +157,7 @@ describe('products.update', () => {
         created_at: '2026-07-13T12:00:00.000Z',
         updated_at: '2026-07-13T12:00:00.000Z'
       },
-      { name: 'Milk', quantity: '2.00', notes: '', category: 'pantry' }
+      { name: 'Milk', quantity: '2.00', notes: '', category_id: 'cat-pantry' }
     )
 
     expect(rpc).toHaveBeenCalledWith('update_product', {
@@ -165,10 +165,32 @@ describe('products.update', () => {
       p_name: 'Milk',
       p_quantity: '2.00',
       p_notes: '',
-      p_category: 'pantry',
+      p_category_id: 'cat-pantry',
       p_expected_version: 7
     })
-    expect(result).toMatchObject({ category: 'pantry' })
+    expect(result).toMatchObject({ category_id: 'cat-pantry' })
+  })
+})
+
+describe('categories.list', () => {
+  beforeEach(() => {
+    from.mockReset()
+  })
+
+  it('lists the household categories ordered by name', async () => {
+    const order = vi.fn()
+    const select = vi.fn(() => ({ order }))
+    from.mockReturnValue({ select })
+    const rows = [
+      { id: 'cat-bakery', household_id: '20000000-0000-0000-0000-000000000001', name: 'bakery' },
+      { id: 'cat-other', household_id: '20000000-0000-0000-0000-000000000001', name: 'other' }
+    ]
+    order.mockResolvedValue({ data: rows, error: null })
+
+    await expect(api.categories.list()).resolves.toEqual(rows)
+    expect(from).toHaveBeenCalledWith('categories')
+    expect(select).toHaveBeenCalledWith('*')
+    expect(order).toHaveBeenCalledWith('name', { ascending: true })
   })
 })
 

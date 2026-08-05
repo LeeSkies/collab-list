@@ -1,31 +1,32 @@
-import { PRODUCT_CATEGORIES, type ProductCategory } from './product-category'
-
-export type ProductGroupKey = 'all' | ProductCategory
+import { categoryLabel } from './product-category'
+import type { Category } from './types'
 
 export interface ProductSectionGroup<T> {
-  key: ProductGroupKey
+  key: string
   label: string
   products: T[]
 }
 
-export type CategoryLabelLookup = (key: string) => string
-
 /**
  * Builds the presentation grouping for a product list. In category mode the
- * taxonomy and fixed order come from PRODUCT_CATEGORIES, empty groups are
- * omitted, and labels are resolved through the translation lookup. In flat
- * mode the list becomes a single unnamed group. Grouping is pure: it knows
- * nothing about Motion, AnimatePresence, or animation modes.
+ * household's categories provide both the membership and the order (sorted by
+ * name), empty groups are omitted, and labels resolve through the translation
+ * lookup with a stored-name fallback for custom names. In flat mode the list
+ * becomes a single unnamed group. Grouping is pure: it knows nothing about
+ * Motion, AnimatePresence, or animation modes.
  */
-export function buildProductGroups<T extends { category: ProductCategory }>(
+export function buildProductGroups<T extends { category_id: string }>(
   products: T[],
-  t: CategoryLabelLookup,
+  categories: Category[],
+  t: (key: string) => string,
   groupByCategory: boolean
 ): ProductSectionGroup<T>[] {
   if (!groupByCategory) return [{ key: 'all', label: '', products }]
-  return PRODUCT_CATEGORIES.map((category) => ({
-    key: category,
-    label: t(`category_${category}`),
-    products: products.filter((product) => product.category === category)
-  })).filter((group) => group.products.length > 0)
+  return categories
+    .map((category) => ({
+      key: category.id,
+      label: categoryLabel(t, category.name),
+      products: products.filter((product) => product.category_id === category.id)
+    }))
+    .filter((group) => group.products.length > 0)
 }

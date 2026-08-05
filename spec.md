@@ -65,7 +65,7 @@ One editable `products` table is the shared list. Each row owns:
 - `name` and its database-enforced duplicate signature;
 - exact decimal `quantity`;
 - optional `notes`;
-- a non-null category key;
+- a non-null category reference;
 - `is_picked` and the timestamp/actor metadata needed for ordering and concurrency;
 - an optimistic concurrency version;
 - `created_at`; and
@@ -73,7 +73,7 @@ One editable `products` table is the shared list. Each row owns:
 
 `quantity` uses an exact PostgreSQL decimal/numeric representation, never binary floating point. It is inclusive from `1` through `999` and has at most two fractional digits.
 
-`category` is a database-validated stable key. Supported keys are `fruit_vegetables`, `dairy_eggs`, `meat_fish`, `bakery`, `pantry`, `frozen`, `drinks`, `snacks`, `household`, and `other`. Existing rows and quick-created products default to `other`; translated labels are presentation only.
+`category_id` references a household-owned `categories` row. Categories carry only `id`, `household_id`, and a trimmed `name` that is case-insensitively unique per household; both the database and the frontend sort them by name. Every household starts with the same ten built-in names — `fruit_vegetables`, `dairy_eggs`, `meat_fish`, `bakery`, `pantry`, `frozen`, `drinks`, `snacks`, `household`, and `other` — and products cannot reference another household's category. Existing rows and quick-created products use the household's `other` category; translated labels are presentation only, and custom category names fall back to their stored name.
 
 Every editable application table has `created_at` and `updated_at`. A database trigger maintains `updated_at` on every accepted update. Supabase does not add or maintain these columns automatically.
 
@@ -101,7 +101,7 @@ Privileged Auth operations run in trusted Supabase execution, such as an Edge Fu
 
 Unpicked products appear first and picked products follow as separate top-level sections in every sorting mode. A compact, visibly labeled control cycles through Default, Name, and Category, and the selected mode persists locally across reloads.
 
-Default mode sorts unpicked products newest first using the ordering timestamp and stable ID tie-breaker. Picked products appear visually muted and sort by their most recent pick event, newest first, with stable ID tie-breaking. Restoring a product updates its unpicked ordering timestamp so it moves to the top of the unpicked section. Name mode uses locale-aware alphabetical ordering within each top-level section. Category mode uses the fixed category taxonomy, omits empty groups, displays localized subgroup headings, and sorts products by locale-aware name within each group.
+Default mode sorts unpicked products newest first using the ordering timestamp and stable ID tie-breaker. Picked products appear visually muted and sort by their most recent pick event, newest first, with stable ID tie-breaking. Restoring a product updates its unpicked ordering timestamp so it moves to the top of the unpicked section. Name mode uses locale-aware alphabetical ordering within each top-level section. Category mode groups by the household's categories sorted by name, omits empty groups, displays localized subgroup headings, and sorts products by locale-aware name within each group.
 
 Search relevance overrides the selected sorting mode while the query is non-empty. Clearing search resumes the persisted mode. Local and remote changes use the same restrained transition language when rows move between sections. Neither section is collapsible, and picking is not represented by a checkbox.
 
@@ -153,7 +153,7 @@ Create and rename use this same signature in application validation and an immut
 
 The trailing plus is the sole creation path. It is inactive for empty normalized input and duplicate input. A duplicate plus uses `aria-disabled="true"`, not native `disabled`, so it remains event-capable for feedback. Activating it creates nothing, places the matching product first in the filtered order, and briefly shakes that row. The effect is subtle and has a reduced-motion alternative.
 
-For valid distinct input, activation creates exactly one product with default quantity `1`, empty notes, and category `other`. Clear and refocus the input only after server success. On failure or timeout, preserve the input and show a retryable message. Creation does not open an intermediate drawer and does not add an existing product.
+For valid distinct input, activation creates exactly one product with default quantity `1`, empty notes, and the household's `other` category. Clear and refocus the input only after server success. On failure or timeout, preserve the input and show a retryable message. Creation does not open an intermediate drawer and does not add an existing product.
 
 ## 9. Product row
 
@@ -169,7 +169,7 @@ Row plus and minus operations change quantity by exactly `1` through atomic data
 
 ## 11. Product edit drawer
 
-The drawer edits name, direct quantity, category, and notes. Category uses an accessible select with translated English and Hebrew labels while saves persist only stable category keys. Names are 1–80 Unicode code points after `NFKC`, trimming outer whitespace, and collapsing internal whitespace. Notes are optional plain text up to 500 Unicode code points; preserve intentional internal line breaks while trimming empty outer whitespace and blank outer lines.
+The drawer edits name, direct quantity, category, and notes. Category uses an accessible select with translated English and Hebrew labels (stored-name fallback for custom names) while saves persist the selected household category reference. Names are 1–80 Unicode code points after `NFKC`, trimming outer whitespace, and collapsing internal whitespace. Notes are optional plain text up to 500 Unicode code points; preserve intentional internal line breaks while trimming empty outer whitespace and blank outer lines.
 
 History sits at block-start/inline-start and Delete at block-start/inline-end. Use logical properties so placement mirrors naturally between Hebrew and English. A currently picked product also displays its latest pick event at the drawer top.
 
@@ -296,7 +296,7 @@ Automate:
 Automate:
 
 - exact decimal storage/calculation at `1`, `999`, valid two-place fractions, invalid precision, and out-of-range values;
-- category defaults, all supported stable keys, database rejection of invalid keys, translated select labels, and versioned category saves;
+- new-product default to the household `other` category, per-household unique category names, database rejection of cross-household category references, translated select labels with stored-name fallback, and versioned category saves;
 - exact `+1`/`-1` atomic steps and unavailable boundary controls;
 - direct quantity validation, 1–80-code-point names, and 500-code-point notes with newline/outer-whitespace behavior;
 - explicit Save dirty/valid states and dirty-close confirmation;

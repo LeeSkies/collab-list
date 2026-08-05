@@ -14,7 +14,7 @@ const product: Product = {
   name_signature: '4:milk',
   quantity: '2.00',
   notes: null,
-  category: 'other',
+  category_id: 'cat-other',
   is_picked: false,
   picked_at: null,
   ordering_at: '2026-07-13T12:00:00.000Z',

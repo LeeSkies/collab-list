@@ -1,30 +1,33 @@
 import { motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
-import { PRODUCT_CATEGORIES, type ProductCategory } from '../lib/product-category'
+import { categoryLabel } from '../lib/product-category'
+import type { Category } from '../lib/types'
 import { AppDrawer } from './drawer'
 
 export function CategoryFilterDrawer({
   open,
   onOpenChange,
+  categories,
   selectedCategories,
   onChange
 }: {
   open: boolean
   onOpenChange(open: boolean): void
-  selectedCategories: ReadonlySet<ProductCategory>
-  onChange(categories: ReadonlySet<ProductCategory>): void
+  categories: Category[]
+  selectedCategories: ReadonlySet<string>
+  onChange(categories: ReadonlySet<string>): void
 }) {
   const { t } = useTranslation()
-  const allCategoriesSelected = selectedCategories.size === PRODUCT_CATEGORIES.length
+  const allCategoriesSelected = selectedCategories.size === categories.length
   const orderedCategories = [
-    ...selectedCategories,
-    ...PRODUCT_CATEGORIES.filter((category) => !selectedCategories.has(category))
+    ...categories.filter((category) => selectedCategories.has(category.id)),
+    ...categories.filter((category) => !selectedCategories.has(category.id))
   ]
 
-  function toggleCategory(category: ProductCategory) {
+  function toggleCategory(categoryId: string) {
     const next = new Set(selectedCategories)
-    if (next.has(category)) next.delete(category)
-    else next.add(category)
+    if (next.has(categoryId)) next.delete(categoryId)
+    else next.add(categoryId)
     onChange(next)
   }
 
@@ -41,21 +44,23 @@ export function CategoryFilterDrawer({
           type="button"
           className="category-filter-option all-categories-option"
           aria-pressed={allCategoriesSelected}
-          onClick={() => onChange(allCategoriesSelected ? new Set() : new Set(PRODUCT_CATEGORIES))}
+          onClick={() =>
+            onChange(allCategoriesSelected ? new Set() : new Set(categories.map((c) => c.id)))
+          }
         >
           {t('allCategories')}
         </motion.button>
         {orderedCategories.map((category) => (
           <motion.button
             layout
-            key={category}
+            key={category.id}
             type="button"
             className="category-filter-option"
-            aria-pressed={selectedCategories.has(category)}
-            onClick={() => toggleCategory(category)}
+            aria-pressed={selectedCategories.has(category.id)}
+            onClick={() => toggleCategory(category.id)}
             transition={{ type: 'spring', duration: 0.35, bounce: 0.1 }}
           >
-            {t(`category_${category}`)}
+            {categoryLabel(t, category.name)}
           </motion.button>
         ))}
       </div>

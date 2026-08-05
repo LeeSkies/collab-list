@@ -1,6 +1,10 @@
-import type { ProductCategory } from './product-category'
-
 export type Role = 'admin' | 'member'
+
+export interface Category {
+  id: string
+  household_id: string
+  name: string
+}
 
 export interface Profile {
   id: string
@@ -20,7 +24,7 @@ export interface Product {
   name_signature: string
   quantity: string
   notes: string | null
-  category: ProductCategory
+  category_id: string
   is_picked: boolean
   picked_at: string | null
   ordering_at: string
@@ -35,7 +39,7 @@ export interface ProductChanges {
   name: string
   quantity: string
   notes: string
-  category: ProductCategory
+  category_id: string
 }
 
 export interface HouseholdMembership {

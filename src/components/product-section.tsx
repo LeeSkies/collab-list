@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { buildProductGroups } from '../lib/product-groups'
-import type { Product } from '../lib/types'
+import type { Category, Product } from '../lib/types'
 import { ProductRow } from './product-row'
 
 export function ProductSection({
@@ -20,6 +20,7 @@ export function ProductSection({
   showCount = true,
   headerAction,
   groupByCategory = false,
+  categories = [],
   animateChanges = true
 }: {
   title: string
@@ -36,10 +37,11 @@ export function ProductSection({
   showCount?: boolean
   headerAction?: ReactNode
   groupByCategory?: boolean
+  categories?: Category[]
   animateChanges?: boolean
 }) {
   const { t } = useTranslation()
-  const groups = buildProductGroups(products, t, groupByCategory)
+  const groups = buildProductGroups(products, categories, t, groupByCategory)
 
   return (
     <section className="product-section">

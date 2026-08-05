@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(141);
+select plan(164);
 
 select has_table('public', 'products', 'products exists');
 select has_table('public', 'households', 'households exist');
@@ -13,6 +13,48 @@ select is(
   (select relreplident::text from pg_class where oid = 'public.products'::regclass),
   'f',
   'products use full replica identity for filtered realtime deletes'
+);
+select has_table('public', 'categories', 'categories exist');
+select has_column('public', 'categories', 'id', 'categories have an id');
+select has_column('public', 'categories', 'household_id', 'categories carry the household boundary');
+select has_column('public', 'categories', 'name', 'categories have a name');
+select col_not_null('public', 'categories', 'household_id', 'category households are required');
+select col_not_null('public', 'categories', 'name', 'category names are required');
+select fk_ok('public', 'categories', 'household_id', 'public', 'households', 'id', 'categories cascade with their household');
+select is(
+  (select count(*) from public.categories),
+  (select count(*) * 10 from public.households),
+  'every household receives exactly ten seeded categories'
+);
+select is(
+  (select count(*) from public.categories as category where category.name not in (
+    'fruit_vegetables', 'dairy_eggs', 'meat_fish', 'bakery', 'pantry',
+    'frozen', 'drinks', 'snacks', 'household', 'other'
+  )),
+  0::bigint,
+  'seeded categories use exactly the ten built-in names'
+);
+select has_column('public', 'products', 'category_id', 'products reference a category');
+select hasnt_column('public', 'products', 'category', 'the legacy text category column is removed');
+select col_not_null('public', 'products', 'category_id', 'product category references are required');
+select fk_ok(
+  'public', 'products', ARRAY['household_id', 'category_id'],
+  'public', 'categories', ARRAY['household_id', 'id'],
+  'products reference categories within their own household'
+);
+select is(
+  (select count(*) from public.products as product where not exists (
+    select 1 from public.categories as category
+    where category.id = product.category_id and category.household_id = product.household_id
+  )),
+  0::bigint,
+  'every product backfills to a category of its own household'
+);
+select is(
+  (select count(*) from public.products as product
+   join public.categories as category on category.id = product.category_id and category.name = 'other'),
+  (select count(*) from public.products),
+  'backfilled products keep their prior category assignment'
 );
 select hasnt_table('public', 'product_pick_history', 'history table was removed');
 select has_table('public', 'profiles', 'profiles exists');
@@ -37,13 +79,7 @@ select throws_ok($$ update public.profiles set name = '' where email = 'admin@ex
 select col_type_is('public', 'products', 'quantity', 'numeric(5,2)', 'quantity is exact numeric');
 select col_is_pk('public', 'products', 'id', 'product id is primary key');
 select fk_ok('public', 'products', 'updated_by', 'public', 'profiles', 'id', 'product updater references profiles');
-select has_column('public', 'products', 'category', 'products have categories');
-select col_not_null('public', 'products', 'category', 'product categories are required');
-select is(
-  (select count(*) from public.products where category <> 'other'),
-  0::bigint,
-  'existing products default to other'
-);
+
 select is(public.product_name_signature('soy milk'), public.product_name_signature('Milk-Soy'), 'unordered case-insensitive tokens collide');
 select isnt(public.product_name_signature('milk milk'), public.product_name_signature('milk'), 'token counts remain distinct');
 select is(public.normalize_product_name('  חלב   סויה '), 'חלב סויה', 'Hebrew whitespace normalizes');
@@ -53,29 +89,38 @@ set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
 select lives_ok($$ select public.create_product('Test apples') $$, 'authenticated user can create through RPC');
 select throws_ok($$ select public.create_product('APPLES test') $$, '23505', null, 'database prevents duplicate word signature');
 select is((select quantity::text from public.products where name = 'Test apples'), '1.00', 'default quantity is one');
-select is((select category from public.products where name = 'Test apples'), 'other', 'quick-created products default to other');
+select is(
+  (select category.name from public.products as product
+   join public.categories as category on category.id = product.category_id
+   where product.name = 'Test apples'),
+  'other',
+  'quick-created products default to the household other category'
+);
 select lives_ok(
   $$
   do $categories$
-  declare category_key text;
+  declare category_row record;
   begin
-    foreach category_key in array array[
-      'fruit_vegetables', 'dairy_eggs', 'meat_fish', 'bakery', 'pantry',
-      'frozen', 'drinks', 'snacks', 'household', 'other'
-    ] loop
+    for category_row in
+      select category.id
+      from public.categories as category
+      join public.household_members as membership
+        on membership.household_id = category.household_id
+      where membership.user_id = auth.uid()
+    loop
       perform public.update_product(
         (select id from public.products where name = 'Test apples'),
         'Test apples',
         '1',
         '',
-        category_key,
+        category_row.id,
         (select version from public.products where name = 'Test apples')
       );
     end loop;
   end
   $categories$
   $$,
-  'all supported category keys can be saved'
+  'every seeded category of the household can be saved'
 );
 select throws_ok(
   $$ select public.update_product(
@@ -83,12 +128,12 @@ select throws_ok(
     'Test apples',
     '1',
     '',
-    'invalid',
+    '00000000-0000-0000-0000-000000000000'::uuid,
     (select version from public.products where name = 'Test apples')
   ) $$,
-  '23514',
+  '23503',
   null,
-  'invalid category keys are rejected'
+  'unknown category references are rejected'
 );
 select lives_ok($$ select public.adjust_product_quantity((select id from public.products where name='Test apples'), 1, (select version from public.products where name='Test apples')) $$, 'atomic increment succeeds');
 select is((select quantity::text from public.products where name = 'Test apples'), '2.00', 'atomic increment changes by one');
@@ -97,20 +142,19 @@ select is((select updated_by from public.products where name='Test apples'), '10
 select isnt((select updated_at from public.products where name='Test apples'), (select created_at from public.products where name='Test apples'), 'product mutation advances updated_at');
 select throws_ok($$ select public.toggle_product_picked((select id from public.products where name='Test apples'), 1, false) $$, 'PT409', 'product_conflict', 'stale pick returns a conflict');
 select throws_ok($$ select public.adjust_product_quantity((select id from public.products where name='Test apples'), 1, 1) $$, 'PT409', 'product_conflict', 'stale quantity adjustment returns a conflict');
-select throws_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', '', 'other', 1) $$, 'PT409', 'product_conflict', 'stale edit returns a conflict');
+select throws_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', '', (select id from public.categories where name = 'other' limit 1), 1) $$, 'PT409', 'product_conflict', 'stale edit returns a conflict');
 select throws_ok($$ select public.delete_product((select id from public.products where name='Test apples'), 1) $$, 'PT409', 'product_conflict', 'stale deletion returns a conflict');
 
-select lives_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', 'seasonal', 'pantry', (select version from public.products where name='Test apples')) $$, 'picked product can be prepared for restore options test');
-select is((select category from public.products where name='Test apples'), 'pantry', 'product category updates through the versioned RPC');
-select lives_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', 'seasonal', (select version from public.products where name='Test apples')) $$, 'older clients can still save through the previous RPC signature');
-select is((select category from public.products where name='Test apples'), 'pantry', 'older client saves preserve the current category');
+select lives_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', 'seasonal', (select id from public.categories where household_id = (select household_id from public.household_members where user_id = auth.uid()) and name = 'pantry'), (select version from public.products where name='Test apples')) $$, 'picked product can be prepared for restore options test');
+select is((select category.name from public.products as product join public.categories as category on category.id = product.category_id where product.name='Test apples'), 'pantry', 'product category updates through the versioned RPC');
+select throws_ok($$ select public.update_product((select id from public.products where name='Test apples'), 'Test apples', '2', 'seasonal', (select version from public.products where name='Test apples')) $$, '42883', null, 'the legacy update_product signature is removed');
 select lives_ok($$ select public.restore_all_products(true, true) $$, 'restore all succeeds');
 select is((select is_picked from public.products where name='Test apples'), false, 'restore all restores picked products');
 select is((select notes from public.products where name='Test apples'), null, 'restore all can clear notes');
 select is((select quantity from public.products where name='Test apples'), 1::numeric, 'restore all can reset quantities');
 
 select lives_ok($$ select public.create_product('Test milk') $$, 'second product created');
-select lives_ok($$ select public.update_product((select id from public.products where name='Test milk'), 'Test milk', '3', 'keep cold', 'dairy_eggs', (select version from public.products where name='Test milk')) $$, 'second product has custom fields');
+select lives_ok($$ select public.update_product((select id from public.products where name='Test milk'), 'Test milk', '3', 'keep cold', (select id from public.categories where household_id = (select household_id from public.household_members where user_id = auth.uid()) and name = 'dairy_eggs'), (select version from public.products where name='Test milk')) $$, 'second product has custom fields');
 select lives_ok($$ select public.toggle_product_picked((select id from public.products where name='Test milk'), (select version from public.products where name='Test milk'), false) $$, 'second product is bought');
 select lives_ok($$ select public.restore_all_products(false, false) $$, 'restore all without resets succeeds');
 select is((select notes from public.products where name='Test milk'), 'keep cold', 'restore all can preserve notes');
@@ -118,8 +162,8 @@ select is((select quantity from public.products where name='Test milk'), 3::nume
 
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
 select lives_ok($$ select public.adjust_product_quantity((select id from public.products where name='Test milk'), 1, (select version from public.products where name='Test milk')) $$, 'member can update a product');
-select lives_ok($$ select public.update_product((select id from public.products where name='Test milk'), 'Test milk', '4', 'keep cold', 'drinks', (select version from public.products where name='Test milk')) $$, 'member can update a product category');
-select is((select category from public.products where name='Test milk'), 'drinks', 'member category update is stored');
+select lives_ok($$ select public.update_product((select id from public.products where name='Test milk'), 'Test milk', '4', 'keep cold', (select id from public.categories where household_id = (select household_id from public.household_members where user_id = auth.uid()) and name = 'drinks'), (select version from public.products where name='Test milk')) $$, 'member can update a product category');
+select is((select category.name from public.products as product join public.categories as category on category.id = product.category_id where product.name='Test milk'), 'drinks', 'member category update is stored');
 select is((select updated_by from public.products where name='Test milk'), '10000000-0000-0000-0000-000000000002'::uuid, 'category mutation stamps the member as updater');
 
 select is((select count(*) from public.households), 1::bigint, 'migration creates the first household');
@@ -167,15 +211,38 @@ with inserted_household as (
 insert into public.household_members(household_id, user_id, role)
 select id, '10000000-0000-0000-0000-000000000003'::uuid, 'member'
 from inserted_household;
-insert into public.products(id, household_id, name, name_signature, created_by)
+-- The fixture household bypasses the creation RPC, so seed its categories the
+-- same way the migration seeds every pre-existing household.
+insert into public.categories(household_id, name)
+select household.id, seed.name
+from public.households as household
+cross join (
+  values
+    ('fruit_vegetables'),
+    ('dairy_eggs'),
+    ('meat_fish'),
+    ('bakery'),
+    ('pantry'),
+    ('frozen'),
+    ('drinks'),
+    ('snacks'),
+    ('household'),
+    ('other')
+) as seed(name)
+where household.name = 'Other household'
+on conflict do nothing;
+insert into public.products(id, household_id, category_id, name, name_signature, created_by)
 select
   '30000000-0000-0000-0000-000000000001'::uuid,
-  household_id,
+  membership.household_id,
+  (select category.id
+   from public.categories as category
+   where category.household_id = membership.household_id and category.name = 'other'),
   'Cross household product',
   public.product_name_signature('Cross household product'),
   '10000000-0000-0000-0000-000000000003'::uuid
-from public.household_members
-where user_id = '10000000-0000-0000-0000-000000000003'::uuid;
+from public.household_members as membership
+where membership.user_id = '10000000-0000-0000-0000-000000000003'::uuid;
 
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
@@ -203,7 +270,10 @@ select is((select count(*) from public.products), 5::bigint, 'first household me
 select throws_ok(
   $$ select public.update_product(
     '30000000-0000-0000-0000-000000000001'::uuid,
-    'stolen product', '1', '', 'other',
+    'stolen product', '1', '',
+    (select id from public.categories
+     where household_id = (select household_id from public.household_members where user_id = auth.uid())
+     and name = 'other'),
     1
   ) $$,
   'PT409',
@@ -243,6 +313,57 @@ select is(
   (select is_picked from public.products where id = '30000000-0000-0000-0000-000000000001'::uuid),
   true,
   'cross-household restore leaves the other household product picked'
+);
+
+-- The composite foreign key, not RPC scoping alone, prevents a product from
+-- referencing another household's category. The foreign id must be captured
+-- before switching roles because category RLS hides it from other members.
+set local role postgres;
+create temp table first_household_category as
+select category.id
+from public.categories as category
+join public.household_members as membership on membership.household_id = category.household_id
+where membership.user_id = '10000000-0000-0000-0000-000000000001'::uuid
+  and category.name = 'other';
+grant select on first_household_category to authenticated;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
+select throws_ok(
+  $$ select public.update_product(
+    '30000000-0000-0000-0000-000000000001'::uuid,
+    'Cross household product', '1', '',
+    (select id from first_household_category),
+    (select version from public.products where id = '30000000-0000-0000-0000-000000000001'::uuid)
+  ) $$,
+  '23503',
+  null,
+  'the RPC rejects a category from another household'
+);
+select is(
+  (select count(*) from public.products where id = '30000000-0000-0000-0000-000000000001'::uuid),
+  1::bigint,
+  'cross-household category rejection leaves the product intact'
+);
+set local role postgres;
+select throws_ok(
+  $$ insert into public.products(household_id, category_id, name, name_signature, created_by)
+     select
+       membership.household_id,
+       (select category.id
+        from public.categories as category
+        join public.household_members as other_membership
+          on other_membership.household_id = category.household_id
+        where other_membership.user_id = '10000000-0000-0000-0000-000000000003'::uuid
+        limit 1),
+       'Foreign category product',
+       public.product_name_signature('Foreign category product'),
+       '10000000-0000-0000-0000-000000000001'::uuid
+     from public.household_members as membership
+     where membership.user_id = '10000000-0000-0000-0000-000000000001'::uuid
+  $$,
+  '23503',
+  null,
+  'the composite foreign key rejects cross-household category references'
 );
 
 set local role postgres;
@@ -340,6 +461,19 @@ select is(
   1::bigint,
   'household creation adds exactly one membership'
 );
+select is(
+  (select count(*) from public.categories
+   where household_id = (select household_id from public.household_members where user_id = '10000000-0000-0000-0000-000000000004'::uuid)),
+  10::bigint,
+  'household creation seeds the ten categories'
+);
+select is(
+  (select count(*) from public.categories
+   where household_id = (select household_id from public.household_members where user_id = '10000000-0000-0000-0000-000000000004'::uuid)
+     and name = 'other'),
+  1::bigint,
+  'household creation seeds the default other category'
+);
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
 select throws_ok(
   $$ select public.create_household_with_trial() $$,
@@ -390,6 +524,54 @@ select is(
    where trial.household_id = (select household_id from public.household_members where user_id = '10000000-0000-0000-0000-000000000004'::uuid)),
   0::bigint,
   'household trial RLS hides other household trials'
+);
+
+-- Category names are unique per household, trimmed, and case-insensitive, and
+-- members can list only their own household's categories through RLS.
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select is(
+  (select count(*) from public.categories),
+  10::bigint,
+  'authenticated members can read their own household categories'
+);
+select is(
+  (select count(*) from public.categories as category
+   join public.household_members as membership on membership.household_id = category.household_id
+   where membership.user_id = '10000000-0000-0000-0000-000000000003'::uuid),
+  0::bigint,
+  'category RLS hides another household categories'
+);
+set local role postgres;
+select throws_ok(
+  $$ insert into public.categories(household_id, name)
+     select household_id, 'Other'
+     from public.household_members where user_id = '10000000-0000-0000-0000-000000000001'::uuid $$,
+  '23505',
+  null,
+  'category names are case-insensitively unique per household'
+);
+select throws_ok(
+  $$ insert into public.categories(household_id, name)
+     select household_id, '  pantry  '
+     from public.household_members where user_id = '10000000-0000-0000-0000-000000000001'::uuid $$,
+  '23514',
+  null,
+  'category names must be stored trimmed'
+);
+select lives_ok(
+  $$ insert into public.categories(household_id, name)
+     select household_id, 'Custom'
+     from public.household_members where user_id = '10000000-0000-0000-0000-000000000003'::uuid $$,
+  'the same category name is allowed in another household'
+);
+select throws_ok(
+  $$ insert into public.categories(household_id, name)
+     select household_id, 'custom'
+     from public.household_members where user_id = '10000000-0000-0000-0000-000000000003'::uuid $$,
+  '23505',
+  null,
+  'category name uniqueness is case-insensitive'
 );
 
 -- Invite links expose only the shaped public preview, and rotation revokes
@@ -650,6 +832,12 @@ select throws_ok(
   '42501',
   'permission denied for table household_trials',
   'anonymous users cannot read household trials'
+);
+select throws_ok(
+  $$ select count(*) from public.categories $$,
+  '42501',
+  'permission denied for table categories',
+  'anonymous users cannot read categories'
 );
 
 select * from finish();

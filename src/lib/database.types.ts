@@ -73,6 +73,32 @@ export type Database = {
           }
         ]
       }
+      categories: {
+        Row: {
+          household_id: string
+          id: string
+          name: string
+        }
+        Insert: {
+          household_id: string
+          id?: string
+          name: string
+        }
+        Update: {
+          household_id?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'categories_household_id_fkey'
+            columns: ['household_id']
+            isOneToOne: false
+            referencedRelation: 'households'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       deleted_households: {
         Row: {
           deleted_at: string
@@ -553,7 +579,7 @@ export type Database = {
       }
       products: {
         Row: {
-          category: string
+          category_id: string
           created_at: string
           created_by: string
           household_id: string
@@ -570,7 +596,7 @@ export type Database = {
           version: number
         }
         Insert: {
-          category?: string
+          category_id: string
           created_at?: string
           created_by?: string
           household_id: string
@@ -587,7 +613,7 @@ export type Database = {
           version?: number
         }
         Update: {
-          category?: string
+          category_id?: string
           created_at?: string
           created_by?: string
           household_id?: string
@@ -610,6 +636,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'products_household_category_fkey'
+            columns: ['household_id', 'category_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['household_id', 'id']
           },
           {
             foreignKeyName: 'products_household_fkey'
@@ -707,7 +740,7 @@ export type Database = {
           p_product_id: string
         }
         Returns: {
-          category: string
+          category_id: string
           created_at: string
           created_by: string
           household_id: string
@@ -768,7 +801,7 @@ export type Database = {
       create_product: {
         Args: { p_name: string }
         Returns: {
-          category: string
+          category_id: string
           created_at: string
           created_by: string
           household_id: string
@@ -958,7 +991,7 @@ export type Database = {
       restore_all_products: {
         Args: { p_clear_notes?: boolean; p_reset_quantities?: boolean }
         Returns: {
-          category: string
+          category_id: string
           created_at: string
           created_by: string
           household_id: string
@@ -1011,7 +1044,7 @@ export type Database = {
           p_product_id: string
         }
         Returns: {
-          category: string
+          category_id: string
           created_at: string
           created_by: string
           household_id: string
@@ -1034,72 +1067,39 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      update_product:
-        | {
-            Args: {
-              p_category: string
-              p_expected_version: number
-              p_name: string
-              p_notes: string
-              p_product_id: string
-              p_quantity: string
-            }
-            Returns: {
-              category: string
-              created_at: string
-              created_by: string
-              household_id: string
-              id: string
-              is_picked: boolean
-              name: string
-              name_signature: string
-              notes: string | null
-              ordering_at: string
-              picked_at: string | null
-              quantity: number
-              updated_at: string
-              updated_by: string | null
-              version: number
-            }[]
-            SetofOptions: {
-              from: '*'
-              to: 'products'
-              isOneToOne: false
-              isSetofReturn: true
-            }
-          }
-        | {
-            Args: {
-              p_expected_version: number
-              p_name: string
-              p_notes: string
-              p_product_id: string
-              p_quantity: string
-            }
-            Returns: {
-              category: string
-              created_at: string
-              created_by: string
-              household_id: string
-              id: string
-              is_picked: boolean
-              name: string
-              name_signature: string
-              notes: string | null
-              ordering_at: string
-              picked_at: string | null
-              quantity: number
-              updated_at: string
-              updated_by: string | null
-              version: number
-            }[]
-            SetofOptions: {
-              from: '*'
-              to: 'products'
-              isOneToOne: false
-              isSetofReturn: true
-            }
-          }
+      update_product: {
+        Args: {
+          p_category_id: string
+          p_expected_version: number
+          p_name: string
+          p_notes: string
+          p_product_id: string
+          p_quantity: string
+        }
+        Returns: {
+          category_id: string
+          created_at: string
+          created_by: string
+          household_id: string
+          id: string
+          is_picked: boolean
+          name: string
+          name_signature: string
+          notes: string | null
+          ordering_at: string
+          picked_at: string | null
+          quantity: number
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }[]
+        SetofOptions: {
+          from: '*'
+          to: 'products'
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       [_ in never]: never

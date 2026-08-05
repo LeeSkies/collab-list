@@ -20,6 +20,24 @@ insert into public.households(name)
 select 'Local household'
 where not exists (select 1 from public.households);
 
+insert into public.categories(household_id, name)
+select household.id, seed.name
+from public.households as household
+cross join (
+  values
+    ('fruit_vegetables'),
+    ('dairy_eggs'),
+    ('meat_fish'),
+    ('bakery'),
+    ('pantry'),
+    ('frozen'),
+    ('drinks'),
+    ('snacks'),
+    ('household'),
+    ('other')
+) as seed(name)
+on conflict do nothing;
+
 insert into public.household_trials(household_id, starts_at, ends_at)
 select household.id, household.created_at, household.created_at + interval '14 days'
 from public.households as household

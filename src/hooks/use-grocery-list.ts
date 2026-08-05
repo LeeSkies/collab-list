@@ -14,7 +14,6 @@ import {
   rollbackOptimisticProduct,
   type ProductMutationState
 } from '../lib/product-mutation-coordinator'
-import { PRODUCT_CATEGORIES, type ProductCategory } from '../lib/product-category'
 import type { Product, ProductChanges } from '../lib/types'
 import { TrailingRefresh } from '../lib/trailing-refresh'
 
@@ -25,7 +24,7 @@ export interface GroceryListConfig {
   paidBoundaryNeedsAttention: boolean
   search: string
   sortMode: ProductSortMode
-  categoryFilters: ReadonlySet<ProductCategory>
+  categoryFilters: ReadonlySet<string>
   locale: string
   t: (key: string, variables?: Record<string, unknown>) => string
   /** Stable product id of the product the drawer currently edits, if any. */
@@ -76,6 +75,7 @@ export function useGroceryList({
     bulk: false
   })
   const productsQueryKey = useMemo(() => ['products', householdId] as const, [householdId])
+  const categoriesQueryKey = useMemo(() => ['categories', householdId] as const, [householdId])
 
   const products = useQuery({
     queryKey: productsQueryKey,
@@ -86,13 +86,28 @@ export function useGroceryList({
     gcTime: 0
   })
 
+  // Household categories are immutable in this phase: seed them once and keep
+  // them cached so grouping, filtering, and drawer options never flicker.
+  const categories = useQuery({
+    queryKey: categoriesQueryKey,
+    queryFn: ({ signal }) => api.categories.list(signal),
+    enabled: Boolean(householdId),
+    retry: 1,
+    staleTime: Infinity,
+    gcTime: Infinity
+  })
+
   // Query lifecycle: drop product caches when the household changes or leaves.
   useEffect(() => {
     const previous = previousHouseholdId.current
-    if (!householdId) client.removeQueries({ queryKey: ['products'] })
+    if (!householdId) {
+      client.removeQueries({ queryKey: ['products'] })
+      client.removeQueries({ queryKey: ['categories'] })
+    }
     if (previous !== householdId) {
       if (previous) {
         client.removeQueries({ queryKey: ['products', previous], exact: true })
+        client.removeQueries({ queryKey: ['categories', previous], exact: true })
       }
       previousHouseholdId.current = householdId
     }
@@ -163,16 +178,24 @@ export function useGroceryList({
 
   // -- derived product-list state --------------------------------------------
   const list = useMemo(() => products.data ?? [], [products.data])
+  const householdCategories = useMemo(() => categories.data ?? [], [categories.data])
+  const categoryNameById = useMemo(() => {
+    const names = new Map<string, string>()
+    for (const category of householdCategories) names.set(category.id, category.name)
+    return (categoryId: string) => names.get(categoryId)
+  }, [householdCategories])
   const categoryFilterActive =
-    categoryFilters.size > 0 && categoryFilters.size < PRODUCT_CATEGORIES.length
+    categoryFilters.size > 0 && categoryFilters.size < householdCategories.length
   const filteredList = useMemo(
     () =>
-      categoryFilterActive ? list.filter((product) => categoryFilters.has(product.category)) : list,
+      categoryFilterActive
+        ? list.filter((product) => categoryFilters.has(product.category_id))
+        : list,
     [categoryFilterActive, categoryFilters, list]
   )
   const { unpicked, picked } = useMemo(
-    () => orderProductSections(filteredList, search, sortMode, locale),
-    [filteredList, locale, search, sortMode]
+    () => orderProductSections(filteredList, search, sortMode, locale, categoryNameById),
+    [categoryNameById, filteredList, locale, search, sortMode]
   )
   const signature = duplicateSignature(search)
   const duplicate = signature
@@ -470,6 +493,7 @@ export function useGroceryList({
 
   return {
     products,
+    categories: householdCategories,
     list,
     unpicked,
     picked,

@@ -90,7 +90,7 @@ describe('product section ordering', () => {
     {
       id: 'unpicked-fuzzy',
       name: 'Mlik',
-      category: 'dairy_eggs' as const,
+      category_id: 'dairy_eggs',
       is_picked: false,
       ordering_at: '2026-07-14T00:00:00Z',
       picked_at: null
@@ -98,7 +98,7 @@ describe('product section ordering', () => {
     {
       id: 'unpicked-prefix',
       name: 'Milk chocolate',
-      category: 'dairy_eggs' as const,
+      category_id: 'dairy_eggs',
       is_picked: false,
       ordering_at: '2026-07-13T00:00:00Z',
       picked_at: null
@@ -106,7 +106,7 @@ describe('product section ordering', () => {
     {
       id: 'picked-fuzzy',
       name: 'Mlik',
-      category: 'dairy_eggs' as const,
+      category_id: 'dairy_eggs',
       is_picked: true,
       ordering_at: '2026-07-14T00:00:00Z',
       picked_at: '2026-07-14T00:00:00Z'
@@ -114,7 +114,7 @@ describe('product section ordering', () => {
     {
       id: 'picked-prefix',
       name: 'Milk chocolate',
-      category: 'dairy_eggs' as const,
+      category_id: 'dairy_eggs',
       is_picked: true,
       ordering_at: '2026-07-13T00:00:00Z',
       picked_at: '2026-07-13T00:00:00Z'
@@ -164,25 +164,41 @@ describe('product section ordering', () => {
     expect(sections.unpicked.map(({ id }) => id)).toEqual(['avocado', 'olives'])
   })
 
-  it('orders categories by the fixed taxonomy and products by localized name', () => {
+  it('orders categories by name and products by localized name', () => {
     const sections = orderProductSections(
       [
-        { ...products[0]!, id: 'snacks-zebra', name: 'Zebra', category: 'snacks' as const },
-        { ...products[0]!, id: 'dairy-milk', name: 'Milk', category: 'dairy_eggs' as const },
-        { ...products[1]!, id: 'snacks-apple', name: 'apple', category: 'snacks' as const },
-        { ...products[1]!, id: 'bakery-bread', name: 'Bread', category: 'bakery' as const }
+        { ...products[0]!, id: 'snacks-zebra', name: 'Zebra', category_id: 'snacks' },
+        { ...products[0]!, id: 'dairy-milk', name: 'Milk', category_id: 'dairy_eggs' },
+        { ...products[1]!, id: 'snacks-apple', name: 'apple', category_id: 'snacks' },
+        { ...products[1]!, id: 'bakery-bread', name: 'Bread', category_id: 'bakery' }
       ],
       '',
       'category',
-      'en'
+      'en',
+      (categoryId) => categoryId
     )
 
     expect(sections.unpicked.map(({ id }) => id)).toEqual([
-      'dairy-milk',
       'bakery-bread',
+      'dairy-milk',
       'snacks-apple',
       'snacks-zebra'
     ])
+  })
+
+  it('sorts custom categories by their stored name', () => {
+    const sections = orderProductSections(
+      [
+        { ...products[0]!, id: 'custom-a', name: 'Milk', category_id: 'zzz' },
+        { ...products[0]!, id: 'custom-b', name: 'Bread', category_id: 'aaa' }
+      ],
+      '',
+      'category',
+      'en',
+      (categoryId) => categoryId
+    )
+
+    expect(sections.unpicked.map(({ id }) => id)).toEqual(['custom-b', 'custom-a'])
   })
 })
 
