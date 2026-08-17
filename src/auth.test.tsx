@@ -176,6 +176,31 @@ describe('AuthProvider profile identity guard', () => {
     expect(householdCurrent).toHaveBeenCalledTimes(1)
   })
 
+  it('does not re-enter startup restoration when the current session token refreshes', async () => {
+    const current = session('user-a')
+    const refreshed = session('user-a')
+    const profileReload = deferred<ReturnType<typeof profile>>()
+    getSession.mockResolvedValue({ data: { session: current } })
+    profileCurrent.mockResolvedValue(profile('user-a'))
+    householdCurrent.mockResolvedValue(membership('user-a', 'household-a'))
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    )
+    await waitFor(() => expect(screen.getByTestId('restoring')).toHaveTextContent('false'))
+
+    profileCurrent.mockReturnValueOnce(profileReload.promise)
+    act(() => authCallback?.('TOKEN_REFRESHED', refreshed))
+
+    expect(screen.getByTestId('restoring')).toHaveTextContent('false')
+    expect(screen.getByTestId('identity')).toHaveTextContent('user-a:user-a:household-a')
+
+    profileReload.resolve(profile('user-a'))
+    await waitFor(() => expect(profileCurrent).toHaveBeenCalledTimes(2))
+  })
+
   it('keeps restoration pending until the profile and membership are loaded', async () => {
     const current = session('user-a')
     const profileLoad = deferred<ReturnType<typeof profile>>()

@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       currentUserId = nextUserId
       setSession(next)
       if (userChanged) setProfile(null)
-      setRestoring(Boolean(next))
+      setRestoring(Boolean(next) && userChanged)
       if (next) queueMicrotask(() => void loadProfile(next.user.id, version))
       else setRestoring(false)
     }
