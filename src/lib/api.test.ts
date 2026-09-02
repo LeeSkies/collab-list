@@ -106,6 +106,38 @@ describe('household.create', () => {
   })
 })
 
+describe('household.current', () => {
+  beforeEach(() => from.mockReset())
+
+  it('returns null when the user has no household membership', async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+    const eq = vi.fn(() => ({ maybeSingle }))
+    const select = vi.fn(() => ({ eq }))
+    from.mockReturnValue({ select })
+
+    await expect(api.household.current('user-id')).resolves.toBeNull()
+    expect(from).toHaveBeenCalledWith('household_members')
+    expect(select).toHaveBeenCalledWith('*')
+    expect(eq).toHaveBeenCalledWith('user_id', 'user-id')
+    expect(maybeSingle).toHaveBeenCalledOnce()
+  })
+
+  it('propagates a membership lookup failure instead of treating it as no household', async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: '503', message: 'temporary network failure' }
+    })
+    const eq = vi.fn(() => ({ maybeSingle }))
+    const select = vi.fn(() => ({ eq }))
+    from.mockReturnValue({ select })
+
+    await expect(api.household.current('user-id')).rejects.toMatchObject({
+      code: '503',
+      message: 'temporary network failure'
+    })
+  })
+})
+
 describe('household.entitlement', () => {
   beforeEach(() => rpc.mockReset())
 

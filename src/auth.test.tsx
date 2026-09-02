@@ -226,13 +226,40 @@ describe('AuthProvider profile identity guard', () => {
     expect(screen.getByTestId('identity')).toHaveTextContent('user-a:user-a:household-a')
   })
 
+  it('does not finish startup restoration on a duplicate same-user auth event', async () => {
+    const current = session('user-a')
+    const profileLoad = deferred<ReturnType<typeof profile>>()
+    const membershipLoad = deferred<ReturnType<typeof membership>>()
+    getSession.mockResolvedValue({ data: { session: current } })
+    profileCurrent.mockReturnValue(profileLoad.promise)
+    householdCurrent.mockReturnValue(membershipLoad.promise)
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    )
+    await waitFor(() => expect(profileCurrent).toHaveBeenCalledWith('user-a'))
+
+    act(() => authCallback?.('INITIAL_SESSION', current))
+
+    expect(screen.getByTestId('restoring')).toHaveTextContent('true')
+    expect(profileCurrent).toHaveBeenCalledTimes(1)
+
+    profileLoad.resolve(profile('user-a'))
+    await waitFor(() => expect(householdCurrent).toHaveBeenCalledWith('user-a'))
+    membershipLoad.resolve(membership('user-a', 'household-a'))
+    await waitFor(() => expect(screen.getByTestId('restoring')).toHaveTextContent('false'))
+    expect(screen.getByTestId('identity')).toHaveTextContent('user-a:user-a:household-a')
+  })
+
   it('keeps an unassigned profile available after realtime membership removal', async () => {
     const current = session('user-a')
     getSession.mockResolvedValue({ data: { session: current } })
     profileCurrent.mockResolvedValue(profile('user-a'))
     householdCurrent
       .mockResolvedValueOnce(membership('user-a', 'household-a'))
-      .mockRejectedValueOnce(new Error('membership not found'))
+      .mockResolvedValueOnce(null)
 
     render(
       <AuthProvider>
@@ -253,6 +280,30 @@ describe('AuthProvider profile identity guard', () => {
     act(() => membershipCallback?.())
     await waitFor(() =>
       expect(screen.getByTestId('identity')).toHaveTextContent('user-a:user-a:no-household')
+    )
+  })
+
+  it('keeps the current household after a transient membership revalidation error', async () => {
+    const current = session('user-a')
+    getSession.mockResolvedValue({ data: { session: current } })
+    profileCurrent.mockResolvedValue(profile('user-a'))
+    householdCurrent.mockResolvedValue(membership('user-a', 'household-a'))
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('identity')).toHaveTextContent('user-a:user-a:household-a')
+    )
+    expect(membershipCallback).toBeDefined()
+
+    householdCurrent.mockRejectedValueOnce(new Error('temporary network failure'))
+    act(() => membershipCallback?.())
+
+    await waitFor(() =>
+      expect(screen.getByTestId('identity')).toHaveTextContent('user-a:user-a:household-a')
     )
   })
 
