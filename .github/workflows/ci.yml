@@ -30,12 +30,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx supabase start
-      - run: npx supabase test db
-      - run: npx supabase db lint --local
-      - name: Stop Supabase before browser tests
-        if: always()
-        run: npx supabase@2.109.1 stop
+      - run: npx supabase@2.109.1 start
+      - run: npx supabase@2.109.1 test db
+      - run: npx supabase@2.109.1 db lint --local
       - run: npx playwright install --with-deps chromium
       - name: Run browser tests against local Supabase
+        env:
+          PLAYWRIGHT_MANAGE_SUPABASE: 'false'
         run: npx playwright test --project=mobile-chromium
+      - name: Stop Supabase
+        if: always()
+        run: npx supabase@2.109.1 stop
