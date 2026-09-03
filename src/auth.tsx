@@ -40,40 +40,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true
     let loadVersion = 0
     let currentUserId: string | null = null
+    let initialSessionApplied = false
+    let initialRestorePending = true
 
     function finishRestore(version: number) {
-      if (active && version === loadVersion) setRestoring(false)
+      if (active && version === loadVersion) {
+        initialRestorePending = false
+        setRestoring(false)
+      }
     }
 
     function applySession(next: Session | null) {
-      sessionRef.current = next
-      const version = ++loadVersion
       const nextUserId = next?.user.id ?? null
       const userChanged = currentUserId !== nextUserId
+
+      // Supabase can emit INITIAL_SESSION after getSession() has already
+      // started loading the same user. Keep the original profile load as the
+      // startup barrier instead of exposing the onboarding route mid-load.
+      if (initialSessionApplied && next && !userChanged && initialRestorePending) {
+        sessionRef.current = next
+        setSession(next)
+        return
+      }
+
+      initialSessionApplied = true
+      sessionRef.current = next
+      const version = ++loadVersion
       currentUserId = nextUserId
       setSession(next)
       if (userChanged) setProfile(null)
-      setRestoring(Boolean(next) && userChanged)
+      setRestoring(Boolean(next) && (userChanged || initialRestorePending))
       if (next) queueMicrotask(() => void loadProfile(next.user.id, version))
-      else setRestoring(false)
+      else {
+        initialRestorePending = false
+        setRestoring(false)
+      }
     }
 
     async function loadProfile(id: string, version: number) {
-      const profile = await api.profile.current(id).catch(() => null)
-      if (!active || version !== loadVersion || currentUserId !== id) return
-      if (!profile) {
-        setProfile(null)
+      try {
+        const profile = await api.profile.current(id)
+        if (!active || version !== loadVersion || currentUserId !== id) return
+        const membership = await api.household.current(id)
+        if (!active || version !== loadVersion || currentUserId !== id) return
+        setProfile(
+          membership
+            ? { ...profile, household_id: membership.household_id, role: membership.role }
+            : { ...profile, household_id: undefined }
+        )
         finishRestore(version)
-        return
+      } catch {
+        // A failed profile or membership read is not proof that the user is
+        // unassigned. Keep startup restoration pending, or preserve the
+        // already-mounted app during a later refresh.
       }
-      const membership = await api.household.current(id).catch(() => null)
-      if (!active || version !== loadVersion || currentUserId !== id) return
-      setProfile(
-        membership
-          ? { ...profile, household_id: membership.household_id, role: membership.role }
-          : { ...profile, household_id: undefined }
-      )
-      finishRestore(version)
     }
 
     void supabase.auth
@@ -114,12 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               : current
           )
         })
-        .catch(() => {
-          if (!active) return
-          setProfile((current) =>
-            current?.id === authenticatedUserId ? { ...current, household_id: undefined } : current
-          )
-        })
+        .catch(() => undefined)
     }
     const channel = supabase
       .channel(`household-membership:${authenticatedUserId}`)
@@ -171,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const isCurrentSession = () => sessionRef.current?.user.id === id
         const nextProfile = await api.profile.current(id)
         if (!isCurrentSession()) return
-        const membership = await api.household.current(id).catch(() => null)
+        const membership = await api.household.current(id)
         if (!isCurrentSession()) return
         setProfile((current) =>
           isCurrentSession()

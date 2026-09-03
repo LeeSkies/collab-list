@@ -28,6 +28,37 @@ function persistFixture(fixture: E2eIdentityFixture) {
   writeFileSync(identityFixturePath, JSON.stringify(fixture, null, 2))
 }
 
+async function waitForAuth(apiUrl: string) {
+  const timeoutAt = Date.now() + 60_000
+  let lastFailure = 'no response'
+  while (Date.now() < timeoutAt) {
+    try {
+      const response = await fetch(`${apiUrl}/auth/v1/health`)
+      if (response.ok) return
+      lastFailure = `HTTP ${response.status}: ${await response.text()}`
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000))
+  }
+  throw new Error(`Local Supabase Auth did not become ready: ${lastFailure}`)
+}
+
+function selectedProjects(config: FullConfig) {
+  const requested = new Set<string>()
+  for (let index = 0; index < process.argv.length; index += 1) {
+    const argument = process.argv[index]
+    if (argument === '--project' && process.argv[index + 1]) {
+      requested.add(process.argv[index + 1])
+    } else if (argument.startsWith('--project=')) {
+      requested.add(argument.slice('--project='.length))
+    }
+  }
+  return requested.size === 0
+    ? config.projects
+    : config.projects.filter((project) => requested.has(project.name))
+}
+
 function localSupabase(): LocalSupabase {
   const output = execFileSync('npx', ['supabase@2.109.1', 'status', '-o', 'env'], {
     encoding: 'utf8'
@@ -47,6 +78,7 @@ function localSupabase(): LocalSupabase {
 export default async function globalSetup(config: FullConfig) {
   execFileSync('npx', ['supabase@2.109.1', 'db', 'reset'], { stdio: 'ignore' })
   const local = localSupabase()
+  await waitForAuth(local.API_URL)
   const admin = createClient(local.API_URL, local.SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false }
   })
@@ -56,7 +88,10 @@ export default async function globalSetup(config: FullConfig) {
   }
   persistFixture(fixture)
 
-  for (const project of config.projects) {
+  // Only provision identities for projects selected by Playwright. This keeps
+  // the CI fixture count below the local temporary signup cap when CI runs a
+  // single project, while retaining all fixtures for an unfiltered local run.
+  for (const project of selectedProjects(config)) {
     const identities = [
       [project.name, `E2E ${project.name}`],
       ...Array.from({ length: project.retries + 1 }, (_, retry) => [
@@ -81,7 +116,11 @@ export default async function globalSetup(config: FullConfig) {
         email_confirm: true,
         user_metadata: { name }
       })
-      if (error || !data.user) throw error ?? new Error(`Could not create ${email}`)
+      if (error || !data.user) {
+        throw new Error(
+          `Could not create ${email}: ${error?.name ?? 'unknown'}: ${error?.message ?? 'missing user'}`
+        )
+      }
       fixture.identities[identityKey] = { id: data.user.id, email, password }
       persistFixture(fixture)
     }

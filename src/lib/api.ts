@@ -166,7 +166,11 @@ function toAdminUser(row: AdminUserRow): AdminUser {
   }
 }
 
-async function unwrap<T>(request: AbortableRequest<T>, externalSignal?: AbortSignal): Promise<T> {
+async function unwrap<T>(
+  request: AbortableRequest<T>,
+  externalSignal?: AbortSignal,
+  allowNull = false
+): Promise<T> {
   const controller = new AbortController()
   let timedOut = false
   const abortFromExternal = () => controller.abort(externalSignal?.reason)
@@ -181,8 +185,8 @@ async function unwrap<T>(request: AbortableRequest<T>, externalSignal?: AbortSig
     const operation = request.abortSignal?.(controller.signal) ?? request
     const { data, error } = await operation
     if (error) throw new ApiError(error.code ?? 'unknown', error.message)
-    if (data == null) throw new ApiError('empty', 'The server returned no data')
-    return data
+    if (data == null && !allowNull) throw new ApiError('empty', 'The server returned no data')
+    return data as T
   } catch (reason) {
     if (timedOut) throw new ApiError('timeout', 'The request timed out')
     throw reason
@@ -307,8 +311,10 @@ export const api = {
   },
   household: {
     current: (userId: string) =>
-      unwrap<HouseholdMembership>(
-        supabase.from('household_members').select('*').eq('user_id', userId).single()
+      unwrap<HouseholdMembership | null>(
+        supabase.from('household_members').select('*').eq('user_id', userId).maybeSingle(),
+        undefined,
+        true
       ),
     create: async () => {
       const rows = await unwrap<HouseholdCreation[]>(supabase.rpc('create_household_with_trial'))

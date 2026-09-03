@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const manageSupabase = process.env.PLAYWRIGHT_MANAGE_SUPABASE !== 'false'
+
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
@@ -11,8 +13,12 @@ export default defineConfig({
   use: { baseURL: 'http://127.0.0.1:5173', trace: 'on-first-retry', screenshot: 'only-on-failure' },
   webServer: {
     command: [
-      "trap 'npx supabase@2.109.1 stop >/dev/null 2>&1 || true' EXIT",
-      'npx supabase@2.109.1 start >/dev/null',
+      ...(manageSupabase
+        ? [
+            "trap 'npx supabase@2.109.1 stop >/dev/null 2>&1 || true' EXIT",
+            'npx supabase@2.109.1 start >/dev/null'
+          ]
+        : []),
       'eval "$(npx supabase@2.109.1 status -o env)"',
       'VITE_SUPABASE_URL="$API_URL" VITE_SUPABASE_PUBLISHABLE_KEY="$ANON_KEY" npm run dev -- --host 127.0.0.1'
     ].join(' && '),
